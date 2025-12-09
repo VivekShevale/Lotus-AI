@@ -9,6 +9,8 @@ import ModelDetails from "../components/ModelDetailes";
 import LogisticForm from "../components/LogisticRegression/LogisticForm";
 import LogisticResult from "../components/LogisticRegression/LogisticResult";
 import api from "../configs/api";
+import DecisionTreeForm from "../components/DecisionTree/DecisionTreeForm";
+import DecisionTreeResult from "../components/DecisionTree/DecisionTreeResult";
 
 export default function ModelTraining() {
   const { slug } = useParams();
@@ -26,6 +28,11 @@ export default function ModelTraining() {
   const [randomState, setRandomState] = useState(42);
   const [isTrained, setIsTrained] = useState(false);
   const [enableDataCleaning, setEnableDataCleaning] = useState(true); // Add this line
+  const [criterion, setCriterion] = useState(null);
+  const [maxDepth, setMaxDepth] = useState(0);
+  const [minSamplesSplit, setMinSamplesSplit] = useState(2);
+  const [minSamplesLeaf, setMinSamplesLeaf] = useState(1);
+  
 
   //import title
   const model = models.find((m) => m.slug === slug);
@@ -69,13 +76,23 @@ export default function ModelTraining() {
 
     if (
       model.slug === "linear-regression" ||
-      model.slug === "logistic-regression"
+      model.slug === "logistic-regression" ||
+      model.slug === "decision-tree"
     ) {
       formData.append("file", file);
       formData.append("target_column", targetColumn);
       formData.append("test_size", testSize);
       formData.append("random_state", randomState);
       formData.append("enable_data_cleaning", enableDataCleaning);
+    }
+    if(
+      model.slug === "decision-tree"
+    ){
+      // Decision Tree specific parameters
+      formData.append("criterion", criterion); // "gini" or "entropy"
+      formData.append("max_depth", maxDepth); // Send empty string if null for unlimited
+      formData.append("min_samples_split", minSamplesSplit);
+      formData.append("min_samples_leaf", minSamplesLeaf);
     }
 
     try {
@@ -283,6 +300,37 @@ export default function ModelTraining() {
                     setEnableDataCleaning={setEnableDataCleaning} // Add this prop
                   />
                 )}
+                {model.slug === "decision-tree" && (
+                  <DecisionTreeForm
+                    onFileChange={setFile}
+                    onTargetChange={handleTargetChange}
+                    targetColumn={targetColumn}
+                    columns={columns}
+                    setResult={setResult}
+                    setError={setError}
+                    testSize={testSize}
+                    setTestSize={setTestSize}
+                    randomState={randomState}
+                    setRandomState={setRandomState}
+                    loading={loading}
+                    downloadLoading={downloadLoading}
+                    isTrained={isTrained}
+                    file={file}
+                    onTrain={handleSubmit}
+                    onDownload={handleDownloadModel}
+                    enableDataCleaning={enableDataCleaning}
+                    setEnableDataCleaning={setEnableDataCleaning}
+                    // Decision Tree specific props
+                    criterion={criterion}
+                    setCriterion={setCriterion}
+                    maxDepth={maxDepth}
+                    setMaxDepth={setMaxDepth}
+                    minSamplesSplit={minSamplesSplit}
+                    setMinSamplesSplit={setMinSamplesSplit}
+                    minSamplesLeaf={minSamplesLeaf}
+                    setMinSamplesLeaf={setMinSamplesLeaf}
+                   />
+                  )}
               </div>
 
               {/* Prediction Results - Full width below the form */}
@@ -292,6 +340,9 @@ export default function ModelTraining() {
                 )}
                 {model.slug == "logistic-regression" && (
                   <LogisticResult result={result} error={error} />
+                )}
+                {model.slug == "decision-tree" && (
+                  <DecisionTreeResult result={result} error={error} targetColumn={targetColumn} />
                 )}
               </div>
             </div>
