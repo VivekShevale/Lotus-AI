@@ -6,6 +6,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from math import sqrt
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelEncoder
 import os
@@ -533,6 +534,203 @@ def knn_classifier_algo(
 
             "model_id": model_id,
             "testSize": float(test_size),
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
+
+def random_forest_classifier_algo(
+    file,
+    target_column=None, 
+    test_size=0.3, 
+    random_state=101, 
+    cleaned_data=True,
+    n_estimators=200,
+    criterion="gini",
+    max_depth=None,
+    min_samples_split=2,
+    min_samples_leaf=1,
+    class_weight=None
+):
+    try:
+        # Read CSV or Excel
+        if file.name.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(file)
+        else:
+            file.seek(0)
+            df = pd.read_csv(io.BytesIO(file.read()))
+
+        if df.empty:
+            return {"error": "Uploaded file is empty."}
+
+        # Optional cleaning
+        if not cleaned_data:
+            df, _ = clean_data(df=df)
+
+        if max_depth == 0:
+            max_depth = None
+
+        # Target column
+        if not target_column:
+            target_column = df.columns[-1]
+
+        if target_column not in df.columns:
+            return {"error": f"Target column '{target_column}' not found."}
+
+        X = df.drop(columns=[target_column])
+        y = df[target_column]
+
+        # Encode input features
+        X = pd.get_dummies(X, drop_first=True)
+        X = X.select_dtypes(include="number")
+
+        if X.empty:
+            return {"error": "No numeric features available after preprocessing."}
+
+        # Encode target if categorical
+        if y.dtype == "object" or y.dtype.name == "category":
+            label_encoder = LabelEncoder()
+            y = label_encoder.fit_transform(y)
+        else:
+            label_encoder = None
+
+        # Train-test split (stratified is better for classification)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y,
+            test_size=test_size,
+            random_state=random_state,
+            stratify=y
+        )
+
+        # Build Random Forest model
+        model = RandomForestClassifier(
+            n_estimators=n_estimators,
+            criterion=criterion,
+            max_depth=max_depth,
+            min_samples_split=min_samples_split,
+            min_samples_leaf=min_samples_leaf,
+            class_weight=class_weight,
+            random_state=random_state
+        )
+
+        # Train
+        model.fit(X_train, y_train)
+        preds = model.predict(X_test)
+        pred_proba = model.predict_proba(X_test)
+
+        # Save model
+        model_id = f"random_forest_classifier_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        model_filename = f"{model_id}.pkl"
+        model_path = os.path.join("trained_models", model_filename)
+
+        os.makedirs("trained_models", exist_ok=True)
+
+        model_data = {
+            "model": model,
+            "feature_names": X.columns.tolist(),
+            "target_column": target_column,
+            "label_encoder": label_encoder,
+            "model_id": model_id,
+            "config": {
+                "n_estimators": n_estimators,
+                "criterion": criterion,
+                "max_depth": max_depth,
+                "min_samples_split": min_samples_split,
+                "min_samples_leaf": min_samples_leaf,
+                "class_weight": class_weight
+            }
+        }
+
+        joblib.dump(model_data, model_path)
+
+        # Metrics
+        accuracy = accuracy_score(y_test, preds)
+        precision = precision_score(y_test, preds, average="weighted", zero_division=0)
+        recall = recall_score(y_test, preds, average="weighted", zero_division=0)
+        f1 = f1_score(y_test, preds, average="weighted", zero_division=0)
+
+        # Feature importances
+        importances = model.feature_importances_
+        feature_importance_dict = dict(
+            sorted(
+                zip(X.columns.tolist(), [float(i) for i in importances]),
+                key=lambda x: x[1],
+                reverse=True
+            )
+        )
+        top_features = dict(list(feature_importance_dict.items())[:5])
+
+        # Class labels
+        if label_encoder:
+            classes = [str(c) for c in label_encoder.classes_]
+        else:
+            classes = [str(c) for c in sorted(pd.Series(y).unique())]
+
+        # Confusion matrix, class report
+        cm = confusion_matrix(y_test, preds).tolist()
+        class_report = classification_report(y_test, preds, output_dict=True)
+        class_dist = dict(pd.Series(y).value_counts())
+
+        # Prediction-level details
+        prediction_data = []
+        for i, (pred, actual, proba) in enumerate(zip(preds, y_test, pred_proba)):
+            prediction_data.append({
+                "index": i + 1,
+                "prediction": int(pred),
+                "actual": int(actual),
+                "confidence": float(max(proba)),
+                "is_correct": bool(pred == actual),
+                "probabilities": [float(p) for p in proba]
+            })
+
+        return {
+            "accuracy": float(accuracy),
+            "precision": float(precision),
+            "recall": float(recall),
+            "f1_score": float(f1),
+
+            # Random Forest internal metrics
+            "n_estimators": n_estimators,
+            "max_depth": max_depth,
+            "min_samples_split": min_samples_split,
+            "min_samples_leaf": min_samples_leaf,
+
+            "confusion_matrix": cm,
+            "class_distribution": {str(k): int(v) for k, v in class_dist.items()},
+
+            "class_report": {
+                str(label): {
+                    "precision": float(metrics.get("precision", 0)),
+                    "recall": float(metrics.get("recall", 0)),
+                    "f1-score": float(metrics.get("f1-score", 0)),
+                    "support": int(metrics.get("support", 0))
+                }
+                for label, metrics in class_report.items()
+                if isinstance(metrics, dict)
+            },
+
+            "classes": classes,
+            "prediction_data": prediction_data,
+
+            "prediction_proba": [
+                [float(p) for p in row] for row in pred_proba
+            ],
+
+            "n_samples": int(len(df)),
+            "n_features": int(X.shape[1]),
+
+            "feature_importance": feature_importance_dict,
+            "top_features": {str(k): float(v) for k, v in top_features.items()},
+
+            "predictions": [int(p) for p in preds],
+            "actual": [int(a) for a in y_test],
+
+            "model_id": str(model_id),
+            "testSize": float(test_size),
+
+            "train_samples": int(len(X_train)),
+            "test_samples": int(len(X_test)),
+            "feature_names": X.columns.tolist()
         }
 
     except Exception as e:

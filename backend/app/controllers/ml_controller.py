@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo
+from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo
     
 def model_training():
     try:
@@ -29,7 +29,7 @@ def model_training():
         # min_samples_split = int(min_samples_split) if min_samples_split not in [None, "", "null"] else 2
         # min_samples_leaf = int(min_samples_leaf) if min_samples_leaf not in [None, "", "null"] else 1
         
-        if model == "KNN":
+        elif model == "KNN":
             # n_neighbors (int)
             n_neighbors = request.form.get("n_neighbors")
             if n_neighbors in [None, "", "null"]:
@@ -54,6 +54,48 @@ def model_training():
             if metric in [None, "", "null"]:
                 metric = "minkowski"
                 # allowed: minkowski, euclidean, manhattan, etc.        
+                
+        elif model == "random-forest":
+        # n_estimators (int)
+            n_estimators = request.form.get("n_estimators")
+            if n_estimators in [None, "", "null"]:
+                n_estimators = 200       # default
+            else:
+                n_estimators = int(n_estimators)
+
+            # criterion (string)
+            criterion = request.form.get("criterion")
+            if criterion in [None, "", "null"]:
+                criterion = "gini"
+            # allowed: gini, entropy, log_loss
+
+            # max_depth (int or None)
+            max_depth = request.form.get("max_depth")
+            if max_depth in [None, "", "null", "0"]:
+                max_depth = None
+            else:
+                max_depth = int(max_depth)
+
+            # min_samples_split (int)
+            min_samples_split = request.form.get("min_samples_split")
+            if min_samples_split in [None, "", "null"]:
+                min_samples_split = 2
+            else:
+                min_samples_split = int(min_samples_split)
+
+            # min_samples_leaf (int)
+            min_samples_leaf = request.form.get("min_samples_leaf")
+            if min_samples_leaf in [None, "", "null"]:
+                min_samples_leaf = 1
+            else:
+                min_samples_leaf = int(min_samples_leaf)
+
+            # class_weight (string or None)
+            class_weight = request.form.get("class_weight")
+            if class_weight in [None, "", "null", "None"]:
+                class_weight = None
+            # allowed: None, "balanced", "balanced_subsample"
+
         
         # Pass target_column to process_csv
         model = request.form.get('model')
@@ -66,6 +108,8 @@ def model_training():
                 result = decision_tree_classifier_algo(f,target_column,test_size,cleaned_data=not enable_data_cleaning,criterion=criterion,max_depth=max_depth,min_samples_split=min_samples_split,min_samples_leaf=min_samples_leaf)
             case "KNN":
                 result = knn_classifier_algo(f,target_column,test_size,cleaned_data=not enable_data_cleaning,n_neighbors=n_neighbors,weights=weights,algorithm=algorithm,metric=metric)
+            case "random-forest":
+                result = random_forest_classifier_algo(f,target_column,test_size,cleaned_data =not enable_data_cleaning,n_estimators=n_estimators,criterion=criterion,max_depth=max_depth,min_samples_split=min_samples_split,min_samples_leaf=min_samples_leaf,class_weight=class_weight)
             case _:  # default case
                 raise ValueError(f"Unknown model: {model}")
     

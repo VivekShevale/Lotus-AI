@@ -13,6 +13,9 @@ import DecisionTreeForm from "../components/DecisionTree/DecisionTreeForm";
 import DecisionTreeResult from "../components/DecisionTree/DecisionTreeResult";
 import KNNClassifierForm from "../components/KNNClassifier/KNNClassifierForm";
 import KNNClassifierResult from "../components/KNNClassifier/KNNClassifierResult";
+import RandomForestForm from "../components/RandomForest/RandomForestForm";
+import RandomForestResult from "../components/RandomForest/RandomForestResult";
+
 
 export default function ModelTraining() {
   const { slug } = useParams();
@@ -38,6 +41,8 @@ export default function ModelTraining() {
   const [weights, setWeights] = useState("uniform");
   const [algorithm, setAlgorithm] = useState("auto");
   const [metric, setMetric] = useState("minkowski");
+  const [nEstimators, setNEstimators] = useState(100);
+  const [classWeight, setClassWeight] = useState(null);
 
   //import title
   const model = models.find((m) => m.slug === slug);
@@ -83,7 +88,8 @@ export default function ModelTraining() {
       model.slug === "linear-regression" ||
       model.slug === "logistic-regression" ||
       model.slug === "decision-tree" ||
-      model.slug === "KNN"
+      model.slug === "KNN" ||
+      model.slug === "random-forest"
     ) {
       formData.append("file", file);
       formData.append("target_column", targetColumn);
@@ -107,7 +113,15 @@ export default function ModelTraining() {
       formData.append("algorithm", algorithm);
       formData.append("metric", metric);
     }
-
+    if (model.slug === "random-forest") {
+      // Random Forest Classifier specific parameters
+      formData.append("n_estimators", nEstimators);
+      formData.append("criterion", criterion); // "gini" or "entropy"
+      formData.append("max_depth", maxDepth || ""); // Send empty string if null for unlimited
+      formData.append("min_samples_split", minSamplesSplit);
+      formData.append("min_samples_leaf", minSamplesLeaf);
+      formData.append("class_weight", classWeight || ""); // Send empty string if null
+    }
     try {
       const res = await api.post("/api/perform", formData, {
         headers: {
@@ -374,6 +388,40 @@ export default function ModelTraining() {
                     setMetric={setMetric}
                   />
                 )}
+              {model.slug == "random-forest" && (
+                <RandomForestForm
+                  onFileChange={setFile}
+                  onTargetChange={handleTargetChange}
+                  targetColumn={targetColumn}
+                  columns={columns}
+                  setResult={setResult}
+                  setError={setError}
+                  testSize={testSize}
+                  setTestSize={setTestSize}
+                  randomState={randomState}
+                  setRandomState={setRandomState}
+                  loading={loading}
+                  downloadLoading={downloadLoading}
+                  isTrained={isTrained}
+                  file={file}
+                  onTrain={handleSubmit}
+                  onDownload={handleDownloadModel}
+                  enableDataCleaning={enableDataCleaning}
+                  setEnableDataCleaning={setEnableDataCleaning}
+                  nEstimators={nEstimators}
+                  setNEstimators={setNEstimators}
+                  criterion={criterion}
+                  setCriterion={setCriterion}
+                  maxDepth={maxDepth}
+                  setMaxDepth={setMaxDepth}
+                  minSamplesSplit={minSamplesSplit}
+                  setMinSamplesSplit={setMinSamplesSplit}
+                  minSamplesLeaf={minSamplesLeaf}
+                  setMinSamplesLeaf={setMinSamplesLeaf}
+                  classWeight={classWeight}
+                  setClassWeight={setClassWeight}
+                />
+              )}
               </div>
 
               {/* Prediction Results - Full width below the form */}
@@ -389,6 +437,9 @@ export default function ModelTraining() {
                 )}
                 {model.slug == "KNN" && (
                   <KNNClassifierResult result={result} error={error} targetColumn={targetColumn} />
+                )}
+                {model.slug == "random-forest" && (
+                  <RandomForestResult result={result} error={error} targetColumn={targetColumn} />
                 )}
               </div>
             </div>
