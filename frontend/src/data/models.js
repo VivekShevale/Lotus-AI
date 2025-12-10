@@ -217,7 +217,7 @@ export const models = [
       "Recommendation systems",
       "Medical diagnosis",
     ],
-    slug: "k-nearest-neighbors",
+    slug: "KNN",
     howItWorks:
       "KNN classifies new data points by looking at the 'k' closest neighbors and using majority voting (classification) or averaging (regression).",
     bestFor: [
@@ -362,6 +362,24 @@ export const models = [
       "Large structured datasets",
       "High-performance prediction tasks",
       "Competitive modeling and Kaggle competitions",
+    ],
+  },
+  {
+    id: 18,
+    name: "Naive Bayes",
+    library: "sklearn",
+    description:
+      "Probabilistic classifier based on Bayes’ theorem, assuming independence among features. Simple, fast, and effective for text and categorical data.",
+    category: "classification",
+    trainingTime: "Fast",
+    useCases: ["Spam detection", "Sentiment analysis", "Document classification"],
+    slug: "naive-bayes",
+    howItWorks:
+      "Naive Bayes applies Bayes’ theorem to compute the probability of classes given feature values, assuming each feature contributes independently to the outcome.",
+    bestFor: [
+      "Text classification and NLP tasks",
+      "High-dimensional data",
+      "Real-time predictions",
     ],
   },
 ];

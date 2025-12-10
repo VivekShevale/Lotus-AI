@@ -6,6 +6,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from math import sqrt
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelEncoder
 import os
 import joblib
@@ -392,6 +393,146 @@ def decision_tree_classifier_algo(
             
             # Feature names
             "feature_names": X.columns.tolist()
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
+    
+    
+def knn_classifier_algo(
+    file,
+    target_column=None,
+    test_size=0.3,
+    random_state=101,
+    cleaned_data=True,
+    n_neighbors=5,
+    weights="uniform",        # "uniform" or "distance"
+    algorithm="auto",         # auto, ball_tree, kd_tree, brute
+    metric="minkowski"        # minkowski, euclidean, manhattan, etc.
+):
+    try:
+        # ----------- Load file (CSV or Excel) -----------
+        if file.name.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(file)
+        else:
+            file.seek(0)
+            df = pd.read_csv(io.BytesIO(file.read()))
+
+        if df.empty:
+            return {"error": "Uploaded file is empty."}
+
+        # ----------- Optional Data Cleaning -----------
+        if not cleaned_data:
+            df, _ = clean_data(df=df)
+
+        # ----------- Determine target column -----------
+        if not target_column:
+            target_column = df.columns[-1]
+
+        if target_column not in df.columns:
+            return {"error": f"Target column '{target_column}' not found."}
+
+        # ----------- Split X, y -----------
+        X = df.drop(columns=[target_column])
+        y = df[target_column]
+
+        # ----------- One-hot encode features -----------
+        X = pd.get_dummies(X, drop_first=True)
+        X = X.select_dtypes(include="number")
+
+        if X.empty:
+            return {"error": "No numeric features available after encoding."}
+
+        # ----------- Encode target if needed -----------
+        label_encoder = None
+        if y.dtype == "object" or y.dtype.name == "category":
+            label_encoder = LabelEncoder()
+            y = label_encoder.fit_transform(y)
+
+        # ----------- Train-test split -----------
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=random_state
+        )
+
+        # ----------- Build KNN Model -----------
+        model = KNeighborsClassifier(
+            n_neighbors=n_neighbors,
+            weights=weights,
+            algorithm=algorithm,
+            metric=metric
+        )
+
+        model.fit(X_train, y_train)
+
+        # ----------- Predictions -----------
+        preds = model.predict(X_test)
+        probs = model.predict_proba(X_test).tolist()
+
+        # ----------- Save the model -----------
+        model_id = f"knn_classifier_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        model_filename = f"{model_id}.pkl"
+        model_path = os.path.join("trained_models", model_filename)
+
+        os.makedirs("trained_models", exist_ok=True)
+
+        model_data = {
+            "model": model,
+            "feature_names": X.columns.tolist(),
+            "target_column": target_column,
+            "label_encoder": label_encoder,
+            "model_id": model_id,
+            "config": {
+                "n_neighbors": n_neighbors,
+                "weights": weights,
+                "algorithm": algorithm,
+                "metric": metric
+            }
+        }
+
+        joblib.dump(model_data, model_path)
+
+        # ----------- Metrics -----------
+        accuracy = float(accuracy_score(y_test, preds))
+        precision = float(precision_score(y_test, preds, average="weighted", zero_division=0))
+        recall = float(recall_score(y_test, preds, average="weighted", zero_division=0))
+        f1 = float(f1_score(y_test, preds, average="weighted", zero_division=0))
+
+        cm = confusion_matrix(y_test, preds).tolist()
+        # Classification report → dict
+        report = classification_report(y_test, preds, output_dict=True)
+        clean_report = {k: {m: float(v) for m, v in metrics.items()} if isinstance(metrics, dict) else float(metrics)
+                        for k, metrics in report.items()}
+
+        # Class distribution
+        class_distribution = pd.Series(y).value_counts().to_dict()
+        class_distribution = {str(k): int(v) for k, v in class_distribution.items()}
+
+        return {
+            "accuracy": round(accuracy, 4),
+            "precision": round(precision, 4),
+            "recall": round(recall, 4),
+            "f1_score": round(f1, 4),
+            "n_samples": int(len(df)),
+            "n_features": int(X.shape[1]),
+            "confusion_matrix": [[int(x) for x in row] for row in cm],
+            "classification_report": clean_report,
+            "class_distribution": class_distribution,
+            "predictions": [int(p) for p in preds],
+            "prediction_proba": probs,
+            "actual": [int(a) for a in y_test],
+            "k_value": int(n_neighbors),           
+            "classes": (
+                label_encoder.classes_.tolist() 
+                if label_encoder is not None 
+                else sorted(list(set(y_test.tolist())))
+            ),
+            "algorithm": str(algorithm),
+            "weights": str(weights),
+            "metric": str(metric),
+            "random_state": int(random_state),
+
+            "model_id": model_id,
+            "testSize": float(test_size),
         }
 
     except Exception as e:

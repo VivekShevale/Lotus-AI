@@ -11,6 +11,8 @@ import LogisticResult from "../components/LogisticRegression/LogisticResult";
 import api from "../configs/api";
 import DecisionTreeForm from "../components/DecisionTree/DecisionTreeForm";
 import DecisionTreeResult from "../components/DecisionTree/DecisionTreeResult";
+import KNNClassifierForm from "../components/KNNClassifier/KNNClassifierForm";
+import KNNClassifierResult from "../components/KNNClassifier/KNNClassifierResult";
 
 export default function ModelTraining() {
   const { slug } = useParams();
@@ -32,7 +34,10 @@ export default function ModelTraining() {
   const [maxDepth, setMaxDepth] = useState(0);
   const [minSamplesSplit, setMinSamplesSplit] = useState(2);
   const [minSamplesLeaf, setMinSamplesLeaf] = useState(1);
-  
+  const [nNeighbors, setNNeighbors] = useState(5);
+  const [weights, setWeights] = useState("uniform");
+  const [algorithm, setAlgorithm] = useState("auto");
+  const [metric, setMetric] = useState("minkowski");
 
   //import title
   const model = models.find((m) => m.slug === slug);
@@ -77,7 +82,8 @@ export default function ModelTraining() {
     if (
       model.slug === "linear-regression" ||
       model.slug === "logistic-regression" ||
-      model.slug === "decision-tree"
+      model.slug === "decision-tree" ||
+      model.slug === "KNN"
     ) {
       formData.append("file", file);
       formData.append("target_column", targetColumn);
@@ -93,6 +99,13 @@ export default function ModelTraining() {
       formData.append("max_depth", maxDepth); // Send empty string if null for unlimited
       formData.append("min_samples_split", minSamplesSplit);
       formData.append("min_samples_leaf", minSamplesLeaf);
+    }
+    if (model.slug === "KNN") {
+      // KNN Classifier specific parameters
+      formData.append("n_neighbors", nNeighbors);
+      formData.append("weights", weights);
+      formData.append("algorithm", algorithm);
+      formData.append("metric", metric);
     }
 
     try {
@@ -331,6 +344,36 @@ export default function ModelTraining() {
                     setMinSamplesLeaf={setMinSamplesLeaf}
                    />
                   )}
+                  {model.slug == "KNN" && (
+                  <KNNClassifierForm
+                    onFileChange={setFile}
+                    onTargetChange={handleTargetChange}
+                    targetColumn={targetColumn}
+                    columns={columns}
+                    setResult={setResult}
+                    setError={setError}
+                    testSize={testSize}
+                    setTestSize={setTestSize}
+                    randomState={randomState}
+                    setRandomState={setRandomState}
+                    loading={loading}
+                    downloadLoading={downloadLoading}
+                    isTrained={isTrained}
+                    file={file}
+                    onTrain={handleSubmit}
+                    onDownload={handleDownloadModel}
+                    enableDataCleaning={enableDataCleaning}
+                    setEnableDataCleaning={setEnableDataCleaning}
+                    nNeighbors={nNeighbors}
+                    setNNeighbors={setNNeighbors}
+                    weights={weights}
+                    setWeights={setWeights}
+                    algorithm={algorithm}
+                    setAlgorithm={setAlgorithm}
+                    metric={metric}
+                    setMetric={setMetric}
+                  />
+                )}
               </div>
 
               {/* Prediction Results - Full width below the form */}
@@ -343,6 +386,9 @@ export default function ModelTraining() {
                 )}
                 {model.slug == "decision-tree" && (
                   <DecisionTreeResult result={result} error={error} targetColumn={targetColumn} />
+                )}
+                {model.slug == "KNN" && (
+                  <KNNClassifierResult result={result} error={error} targetColumn={targetColumn} />
                 )}
               </div>
             </div>

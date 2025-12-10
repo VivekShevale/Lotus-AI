@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo
+from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo
     
 def model_training():
     try:
@@ -29,6 +29,31 @@ def model_training():
         # min_samples_split = int(min_samples_split) if min_samples_split not in [None, "", "null"] else 2
         # min_samples_leaf = int(min_samples_leaf) if min_samples_leaf not in [None, "", "null"] else 1
         
+        if model == "KNN":
+            # n_neighbors (int)
+            n_neighbors = request.form.get("n_neighbors")
+            if n_neighbors in [None, "", "null"]:
+                n_neighbors = 5
+            else:
+                n_neighbors = int(n_neighbors)
+
+            # weights (string)
+            weights = request.form.get("weights")
+            if weights in [None, "", "null"]:
+                weights = "uniform"  # default
+            # allowed: "uniform", "distance"
+
+            # algorithm (string)
+            algorithm = request.form.get("algorithm")
+            if algorithm in [None, "", "null"]:
+                algorithm = "auto"
+            # allowed: auto, ball_tree, kd_tree, brute
+
+            # metric (string)
+            metric = request.form.get("metric")
+            if metric in [None, "", "null"]:
+                metric = "minkowski"
+                # allowed: minkowski, euclidean, manhattan, etc.        
         
         # Pass target_column to process_csv
         model = request.form.get('model')
@@ -39,6 +64,8 @@ def model_training():
                 result = logistic_regression_algo(f, target_column, test_size, cleaned_data=not enable_data_cleaning)
             case "decision-tree":
                 result = decision_tree_classifier_algo(f,target_column,test_size,cleaned_data=not enable_data_cleaning,criterion=criterion,max_depth=max_depth,min_samples_split=min_samples_split,min_samples_leaf=min_samples_leaf)
+            case "KNN":
+                result = knn_classifier_algo(f,target_column,test_size,cleaned_data=not enable_data_cleaning,n_neighbors=n_neighbors,weights=weights,algorithm=algorithm,metric=metric)
             case _:  # default case
                 raise ValueError(f"Unknown model: {model}")
     
