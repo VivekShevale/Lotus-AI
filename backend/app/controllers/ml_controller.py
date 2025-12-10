@@ -1,6 +1,7 @@
 from flask import request, jsonify
 from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo
-    
+from app.services.neural_services import neural_network_regression_algo    
+
 def model_training():
     try:
         if 'file' not in request.files:
@@ -110,6 +111,9 @@ def model_training():
                 result = knn_classifier_algo(f,target_column,test_size,cleaned_data=not enable_data_cleaning,n_neighbors=n_neighbors,weights=weights,algorithm=algorithm,metric=metric)
             case "random-forest":
                 result = random_forest_classifier_algo(f,target_column,test_size,cleaned_data =not enable_data_cleaning,n_estimators=n_estimators,criterion=criterion,max_depth=max_depth,min_samples_split=min_samples_split,min_samples_leaf=min_samples_leaf,class_weight=class_weight)
+            case "neural-network":
+                result = neural_network_regression_algo(f, target_column=None, test_size=0.3, random_state=101, cleaned_data=True,
+                                   hidden_layer_sizes=(100,), activation='relu', solver='adam', max_iter=500)
             case _:  # default case
                 raise ValueError(f"Unknown model: {model}")
     

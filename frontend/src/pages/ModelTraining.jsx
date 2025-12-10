@@ -15,6 +15,8 @@ import KNNClassifierForm from "../components/KNNClassifier/KNNClassifierForm";
 import KNNClassifierResult from "../components/KNNClassifier/KNNClassifierResult";
 import RandomForestForm from "../components/RandomForest/RandomForestForm";
 import RandomForestResult from "../components/RandomForest/RandomForestResult";
+import NeuralNetworkForm from "../components/NeuralRegressor/RegressorForm";
+import NeuralNetworkResult from "../components/NeuralRegressor/RegressorResult";
 
 
 export default function ModelTraining() {
@@ -43,6 +45,12 @@ export default function ModelTraining() {
   const [metric, setMetric] = useState("minkowski");
   const [nEstimators, setNEstimators] = useState(100);
   const [classWeight, setClassWeight] = useState(null);
+
+  //neural-network-regressor
+  const [hiddenLayerSizes, setHiddenLayerSizes] = useState("100");
+  const [activation, setActivation] = useState("relu");
+  const [solver, setSolver] = useState("adam");
+  const [maxIter, setMaxIter] = useState(500);
 
   //import title
   const model = models.find((m) => m.slug === slug);
@@ -89,7 +97,8 @@ export default function ModelTraining() {
       model.slug === "logistic-regression" ||
       model.slug === "decision-tree" ||
       model.slug === "KNN" ||
-      model.slug === "random-forest"
+      model.slug === "random-forest" ||
+      model.slug === "neural-network"
     ) {
       formData.append("file", file);
       formData.append("target_column", targetColumn);
@@ -121,6 +130,12 @@ export default function ModelTraining() {
       formData.append("min_samples_split", minSamplesSplit);
       formData.append("min_samples_leaf", minSamplesLeaf);
       formData.append("class_weight", classWeight || ""); // Send empty string if null
+    }
+    if (model.slug === "neural-network") {
+      formData.append("hidden_layer_sizes", hiddenLayerSizes);
+      formData.append("activation", activation);
+      formData.append("solver", solver);
+      formData.append("max_iter", maxIter);
     }
     try {
       const res = await api.post("/api/perform", formData, {
@@ -356,9 +371,9 @@ export default function ModelTraining() {
                     setMinSamplesSplit={setMinSamplesSplit}
                     minSamplesLeaf={minSamplesLeaf}
                     setMinSamplesLeaf={setMinSamplesLeaf}
-                   />
-                  )}
-                  {model.slug == "KNN" && (
+                  />
+                )}
+                {model.slug == "KNN" && (
                   <KNNClassifierForm
                     onFileChange={setFile}
                     onTargetChange={handleTargetChange}
@@ -388,40 +403,70 @@ export default function ModelTraining() {
                     setMetric={setMetric}
                   />
                 )}
-              {model.slug == "random-forest" && (
-                <RandomForestForm
-                  onFileChange={setFile}
-                  onTargetChange={handleTargetChange}
-                  targetColumn={targetColumn}
-                  columns={columns}
-                  setResult={setResult}
-                  setError={setError}
-                  testSize={testSize}
-                  setTestSize={setTestSize}
-                  randomState={randomState}
-                  setRandomState={setRandomState}
-                  loading={loading}
-                  downloadLoading={downloadLoading}
-                  isTrained={isTrained}
-                  file={file}
-                  onTrain={handleSubmit}
-                  onDownload={handleDownloadModel}
-                  enableDataCleaning={enableDataCleaning}
-                  setEnableDataCleaning={setEnableDataCleaning}
-                  nEstimators={nEstimators}
-                  setNEstimators={setNEstimators}
-                  criterion={criterion}
-                  setCriterion={setCriterion}
-                  maxDepth={maxDepth}
-                  setMaxDepth={setMaxDepth}
-                  minSamplesSplit={minSamplesSplit}
-                  setMinSamplesSplit={setMinSamplesSplit}
-                  minSamplesLeaf={minSamplesLeaf}
-                  setMinSamplesLeaf={setMinSamplesLeaf}
-                  classWeight={classWeight}
-                  setClassWeight={setClassWeight}
-                />
-              )}
+                {model.slug == "random-forest" && (
+                  <RandomForestForm
+                    onFileChange={setFile}
+                    onTargetChange={handleTargetChange}
+                    targetColumn={targetColumn}
+                    columns={columns}
+                    setResult={setResult}
+                    setError={setError}
+                    testSize={testSize}
+                    setTestSize={setTestSize}
+                    randomState={randomState}
+                    setRandomState={setRandomState}
+                    loading={loading}
+                    downloadLoading={downloadLoading}
+                    isTrained={isTrained}
+                    file={file}
+                    onTrain={handleSubmit}
+                    onDownload={handleDownloadModel}
+                    enableDataCleaning={enableDataCleaning}
+                    setEnableDataCleaning={setEnableDataCleaning}
+                    nEstimators={nEstimators}
+                    setNEstimators={setNEstimators}
+                    criterion={criterion}
+                    setCriterion={setCriterion}
+                    maxDepth={maxDepth}
+                    setMaxDepth={setMaxDepth}
+                    minSamplesSplit={minSamplesSplit}
+                    setMinSamplesSplit={setMinSamplesSplit}
+                    minSamplesLeaf={minSamplesLeaf}
+                    setMinSamplesLeaf={setMinSamplesLeaf}
+                    classWeight={classWeight}
+                    setClassWeight={setClassWeight}
+                  />
+                )}
+                {model.slug == "neural-network" && (
+                  <NeuralNetworkForm
+                    onFileChange={setFile}
+                    onTargetChange={handleTargetChange}
+                    targetColumn={targetColumn}
+                    columns={columns}
+                    setError={setError}
+                    setResult={setResult}
+                    testSize={testSize}
+                    setTestSize={setTestSize}
+                    randomState={randomState}
+                    setRandomState={setRandomState}
+                    loading={loading}
+                    downloadLoading={downloadLoading}
+                    isTrained={isTrained}
+                    file={file}
+                    onTrain={handleSubmit}
+                    onDownload={handleDownloadModel}
+                    enableDataCleaning={enableDataCleaning}
+                    setEnableDataCleaning={setEnableDataCleaning}
+                    hiddenLayerSizes={hiddenLayerSizes}
+                    setHiddenLayerSizes={setHiddenLayerSizes}
+                    activation={activation}
+                    setActivation={setActivation}
+                    solver={solver}
+                    setSolver={setSolver}
+                    maxIter={maxIter}
+                    setMaxIter={setMaxIter}
+                  />
+                )}
               </div>
 
               {/* Prediction Results - Full width below the form */}
@@ -440,6 +485,13 @@ export default function ModelTraining() {
                 )}
                 {model.slug == "random-forest" && (
                   <RandomForestResult result={result} error={error} targetColumn={targetColumn} />
+                )}
+                {model.slug == "neural-network" && (
+                  <NeuralNetworkResult
+                    result={result}
+                    error={error}
+                    targetColumn={targetColumn}
+                  />
                 )}
               </div>
             </div>
