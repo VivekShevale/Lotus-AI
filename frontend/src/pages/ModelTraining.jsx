@@ -17,7 +17,8 @@ import RandomForestForm from "../components/RandomForest/RandomForestForm";
 import RandomForestResult from "../components/RandomForest/RandomForestResult";
 import NeuralNetworkForm from "../components/NeuralRegressor/RegressorForm";
 import NeuralNetworkResult from "../components/NeuralRegressor/RegressorResult";
-
+import RidgeRegressionForm from "../components/RidgeRegression/RidgeRegressionForm";
+import RidgeRegressionResult from "../components/RidgeRegression/RidgeRegressionResult";
 
 export default function ModelTraining() {
   const { slug } = useParams();
@@ -51,6 +52,8 @@ export default function ModelTraining() {
   const [activation, setActivation] = useState("relu");
   const [solver, setSolver] = useState("adam");
   const [maxIter, setMaxIter] = useState(500);
+
+  const [alpha, setAlpha] = useState(1.0);
 
   //import title
   const model = models.find((m) => m.slug === slug);
@@ -98,7 +101,8 @@ export default function ModelTraining() {
       model.slug === "decision-tree" ||
       model.slug === "KNN" ||
       model.slug === "random-forest" ||
-      model.slug === "neural-network"
+      model.slug === "neural-network" ||
+      model.slug === "ridge-regression"
     ) {
       formData.append("file", file);
       formData.append("target_column", targetColumn);
@@ -106,9 +110,7 @@ export default function ModelTraining() {
       formData.append("random_state", randomState);
       formData.append("enable_data_cleaning", enableDataCleaning);
     }
-    if(
-      model.slug === "decision-tree"
-    ){
+    if (model.slug === "decision-tree") {
       // Decision Tree specific parameters
       formData.append("criterion", criterion); // "gini" or "entropy"
       formData.append("max_depth", maxDepth); // Send empty string if null for unlimited
@@ -136,6 +138,9 @@ export default function ModelTraining() {
       formData.append("activation", activation);
       formData.append("solver", solver);
       formData.append("max_iter", maxIter);
+    }
+    if (model.slug === "ridge-regression") {
+      formData.append("alpha", alpha);
     }
     try {
       const res = await api.post("/api/perform", formData, {
@@ -467,6 +472,30 @@ export default function ModelTraining() {
                     setMaxIter={setMaxIter}
                   />
                 )}
+                {model.slug == "ridge-regression" && (
+                  <RidgeRegressionForm
+                    onFileChange={setFile}
+                    onTargetChange={handleTargetChange}
+                    targetColumn={targetColumn}
+                    columns={columns}
+                    setError={setError}
+                    setResult={setResult}
+                    testSize={testSize}
+                    setTestSize={setTestSize}
+                    randomState={randomState}
+                    setRandomState={setRandomState}
+                    loading={loading}
+                    downloadLoading={downloadLoading}
+                    isTrained={isTrained}
+                    file={file}
+                    onTrain={handleSubmit}
+                    onDownload={handleDownloadModel}
+                    enableDataCleaning={enableDataCleaning}
+                    setEnableDataCleaning={setEnableDataCleaning}
+                    alpha={alpha}
+                    setAlpha={setAlpha}
+                  />
+                )}
               </div>
 
               {/* Prediction Results - Full width below the form */}
@@ -478,16 +507,35 @@ export default function ModelTraining() {
                   <LogisticResult result={result} error={error} />
                 )}
                 {model.slug == "decision-tree" && (
-                  <DecisionTreeResult result={result} error={error} targetColumn={targetColumn} />
+                  <DecisionTreeResult
+                    result={result}
+                    error={error}
+                    targetColumn={targetColumn}
+                  />
                 )}
                 {model.slug == "KNN" && (
-                  <KNNClassifierResult result={result} error={error} targetColumn={targetColumn} />
+                  <KNNClassifierResult
+                    result={result}
+                    error={error}
+                    targetColumn={targetColumn}
+                  />
                 )}
                 {model.slug == "random-forest" && (
-                  <RandomForestResult result={result} error={error} targetColumn={targetColumn} />
+                  <RandomForestResult
+                    result={result}
+                    error={error}
+                    targetColumn={targetColumn}
+                  />
                 )}
                 {model.slug == "neural-network" && (
                   <NeuralNetworkResult
+                    result={result}
+                    error={error}
+                    targetColumn={targetColumn}
+                  />
+                )}
+                {model.slug == "ridge-regression" && (
+                  <RidgeRegressionResult
                     result={result}
                     error={error}
                     targetColumn={targetColumn}

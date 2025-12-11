@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo
+from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo, ridge_regression_algo
 from app.services.neural_services import neural_network_regression_algo    
 
 def model_training():
@@ -9,7 +9,7 @@ def model_training():
 
         f = request.files['file']
         target_column = request.form.get('target_column')  # get frontend selected column
-
+        random_state = int(request.form.get('random_state'))
         test_size = float(request.form.get('test_size'))
         enable_data_cleaning = request.form.get('enable_data_cleaning', 'true').lower() == 'true'
 
@@ -96,24 +96,36 @@ def model_training():
             if class_weight in [None, "", "null", "None"]:
                 class_weight = None
             # allowed: None, "balanced", "balanced_subsample"
+        
+        elif model=="neural-network":
+            raw= request.form.get("hidden_layer_sizes")
+            hidden_layer_sizes = tuple(int(x) for x in raw.split(","))
+            activation = request.form.get('activation')
+            solver = request.form.get('solver')
+            max_iter = int(request.form.get("max_iter"))
 
+        elif model=="ridge-regression":
+            alpha = float(request.form.get('alpha'))
+            
         
         # Pass target_column to process_csv
         model = request.form.get('model')
         match (model):
             case "linear-regression":
-                result = linear_regression_algo(f, target_column, test_size, cleaned_data=not enable_data_cleaning)
+                result = linear_regression_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning)
             case "logistic-regression":
-                result = logistic_regression_algo(f, target_column, test_size, cleaned_data=not enable_data_cleaning)
+                result = logistic_regression_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning)
             case "decision-tree":
-                result = decision_tree_classifier_algo(f,target_column,test_size,cleaned_data=not enable_data_cleaning,criterion=criterion,max_depth=max_depth,min_samples_split=min_samples_split,min_samples_leaf=min_samples_leaf)
+                result = decision_tree_classifier_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning, criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf)
             case "KNN":
-                result = knn_classifier_algo(f,target_column,test_size,cleaned_data=not enable_data_cleaning,n_neighbors=n_neighbors,weights=weights,algorithm=algorithm,metric=metric)
+                result = knn_classifier_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning, n_neighbors=n_neighbors, weights=weights, algorithm=algorithm, metric=metric)
             case "random-forest":
-                result = random_forest_classifier_algo(f,target_column,test_size,cleaned_data =not enable_data_cleaning,n_estimators=n_estimators,criterion=criterion,max_depth=max_depth,min_samples_split=min_samples_split,min_samples_leaf=min_samples_leaf,class_weight=class_weight)
+                result = random_forest_classifier_algo(f, target_column, test_size, random_state, cleaned_data =not enable_data_cleaning, n_estimators=n_estimators, criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, class_weight=class_weight)
             case "neural-network":
-                result = neural_network_regression_algo(f, target_column=None, test_size=0.3, random_state=101, cleaned_data=True,
-                                   hidden_layer_sizes=(100,), activation='relu', solver='adam', max_iter=500)
+                result = neural_network_regression_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning,
+                                   hidden_layer_sizes=hidden_layer_sizes, activation=activation, solver=solver, max_iter=max_iter)
+            case "ridge-regression":
+                result = ridge_regression_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning, alpha=alpha)
             case _:  # default case
                 raise ValueError(f"Unknown model: {model}")
     
