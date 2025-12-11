@@ -19,6 +19,8 @@ import NeuralNetworkForm from "../components/NeuralRegressor/RegressorForm";
 import NeuralNetworkResult from "../components/NeuralRegressor/RegressorResult";
 import RidgeRegressionForm from "../components/RidgeRegression/RidgeRegressionForm";
 import RidgeRegressionResult from "../components/RidgeRegression/RidgeRegressionResult";
+import SVMForm from "../components/SVM/SVMForm";
+import SVMResult from "../components/SVM/SVMResult";
 
 export default function ModelTraining() {
   const { slug } = useParams();
@@ -46,7 +48,14 @@ export default function ModelTraining() {
   const [metric, setMetric] = useState("minkowski");
   const [nEstimators, setNEstimators] = useState(100);
   const [classWeight, setClassWeight] = useState(null);
-
+  // SVM
+  const [svmC, setSvmC] = useState(1.0);
+  const [kernel, setKernel] = useState("rbf");
+  const [gamma, setGamma] = useState("scale");
+  const [customGamma, setCustomGamma] = useState(0.1);
+  const [degree, setDegree] = useState(3);
+  const [shrinking, setShrinking] = useState(true);
+  const [probability, setProbability] = useState(false);
   //neural-network-regressor
   const [hiddenLayerSizes, setHiddenLayerSizes] = useState("100");
   const [activation, setActivation] = useState("relu");
@@ -102,7 +111,8 @@ export default function ModelTraining() {
       model.slug === "KNN" ||
       model.slug === "random-forest" ||
       model.slug === "neural-network" ||
-      model.slug === "ridge-regression"
+      model.slug === "ridge-regression" ||
+      model.slug === "support-vector-machine"
     ) {
       formData.append("file", file);
       formData.append("target_column", targetColumn);
@@ -141,6 +151,31 @@ export default function ModelTraining() {
     }
     if (model.slug === "ridge-regression") {
       formData.append("alpha", alpha);
+    }
+    if (model.slug === "support-vector-machine") {
+      // SVM Classifier specific parameters
+      formData.append("C", svmC);
+      formData.append("kernel", kernel);
+
+      // Handle gamma parameter
+      if (gamma === "custom" && customGamma) {
+        formData.append("gamma", customGamma);
+      } else {
+        formData.append("gamma", gamma);
+      }
+
+      // Only append degree if kernel is polynomial
+      if (kernel === "poly") {
+        formData.append("degree", degree);
+      }
+
+      formData.append("shrinking", shrinking);
+      formData.append("probability", probability);
+
+      // Only append class_weight if not "none"
+      if (classWeight !== "none") {
+        formData.append("class_weight", classWeight);
+      }
     }
     try {
       const res = await api.post("/api/perform", formData, {
@@ -496,6 +531,45 @@ export default function ModelTraining() {
                     setAlpha={setAlpha}
                   />
                 )}
+                {model.slug == "support-vector-machine" && (
+                  <SVMForm
+                    onFileChange={setFile}
+                    onTargetChange={handleTargetChange}
+                    targetColumn={targetColumn}
+                    columns={columns}
+                    setResult={setResult}
+                    setError={setError}
+                    testSize={testSize}
+                    setTestSize={setTestSize}
+                    randomState={randomState}
+                    setRandomState={setRandomState}
+                    loading={loading}
+                    downloadLoading={downloadLoading}
+                    isTrained={isTrained}
+                    file={file}
+                    onTrain={handleSubmit}
+                    onDownload={handleDownloadModel}
+                    enableDataCleaning={enableDataCleaning}
+                    setEnableDataCleaning={setEnableDataCleaning}
+                    // SVM specific props
+                    svmC={svmC}
+                    setSvmC={setSvmC}
+                    kernel={kernel}
+                    setKernel={setKernel}
+                    gamma={gamma}
+                    setGamma={setGamma}
+                    customGamma={customGamma}
+                    setCustomGamma={setCustomGamma}
+                    degree={degree}
+                    setDegree={setDegree}
+                    shrinking={shrinking}
+                    setShrinking={setShrinking}
+                    probability={probability}
+                    setProbability={setProbability}
+                    classWeight={classWeight}
+                    setClassWeight={setClassWeight}
+                  />
+                )}
               </div>
 
               {/* Prediction Results - Full width below the form */}
@@ -536,6 +610,13 @@ export default function ModelTraining() {
                 )}
                 {model.slug == "ridge-regression" && (
                   <RidgeRegressionResult
+                    result={result}
+                    error={error}
+                    targetColumn={targetColumn}
+                  />
+                )}
+                {model.slug == "support-vector-machine" && result && (
+                  <SVMResult
                     result={result}
                     error={error}
                     targetColumn={targetColumn}

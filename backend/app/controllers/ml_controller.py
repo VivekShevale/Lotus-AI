@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo, ridge_regression_algo
+from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo, ridge_regression_algo, svm_classifier_algo
 from app.services.neural_services import neural_network_regression_algo    
 
 def model_training():
@@ -107,6 +107,60 @@ def model_training():
         elif model=="ridge-regression":
             alpha = float(request.form.get('alpha'))
             
+        elif model == "support-vector-machine":
+    
+            kernel = request.form.get("kernel")
+            # kernel (string)
+            if kernel in [None, "", "null"]:
+                kernel = "rbf"   # default
+            # allowed: linear, rbf, poly, sigmoid
+
+            C = request.form.get("C")
+            # C (float)
+            if C in [None, "", "null"]:
+                C = 1.0
+            else:
+                C = float(C)
+
+            gamma = request.form.get("gamma")
+            # gamma (string or float)
+            if gamma in [None, "", "null"]:
+                gamma = "scale"   # default
+            else:
+                # if numeric convert to float
+                try:
+                    gamma = float(gamma)
+                except:
+                    gamma = gamma   # keep "scale" or "auto"
+
+            # degree (int) only used for poly kernel but we keep it consistent
+            degree = request.form.get("degree")
+            if degree in [None, "", "null"]:
+                degree = 3
+            else:
+                degree = int(degree)
+
+            # shrinking (bool)
+            shrinking = request.form.get("shrinking")
+            if shrinking in [None, "", "null"]:
+                shrinking = True
+            else:
+                shrinking = (shrinking.lower() == "true")
+
+            # probability (bool)
+            probability = request.form.get("probability")
+            if probability in [None, "", "null"]:
+                probability = True
+            else:
+                probability = (probability.lower() == "true")
+        
+            # class_weight (string or None)
+            class_weight = request.form.get("class_weight")
+            if class_weight in [None, "", "null", "None"]:
+                class_weight = None
+            # allowed: None, "balanced"
+
+            
         
         # Pass target_column to process_csv
         model = request.form.get('model')
@@ -122,10 +176,11 @@ def model_training():
             case "random-forest":
                 result = random_forest_classifier_algo(f, target_column, test_size, random_state, cleaned_data =not enable_data_cleaning, n_estimators=n_estimators, criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, class_weight=class_weight)
             case "neural-network":
-                result = neural_network_regression_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning,
-                                   hidden_layer_sizes=hidden_layer_sizes, activation=activation, solver=solver, max_iter=max_iter)
+                result = neural_network_regression_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning,hidden_layer_sizes=hidden_layer_sizes, activation=activation, solver=solver, max_iter=max_iter)
             case "ridge-regression":
                 result = ridge_regression_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning, alpha=alpha)
+            case "support-vector-machine":
+                result = svm_classifier_algo(f,target_column,test_size,random_state,cleaned_data=not enable_data_cleaning,kernel=kernel,C=C,gamma=gamma,degree=degree,shrinking=shrinking,probability=probability,class_weight=class_weight)
             case _:  # default case
                 raise ValueError(f"Unknown model: {model}")
     

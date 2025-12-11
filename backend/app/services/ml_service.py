@@ -9,6 +9,7 @@ from math import sqrt
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelEncoder
+from sklearn.svm import SVC
 import os
 import joblib
 from datetime import datetime
@@ -822,6 +823,146 @@ def ridge_regression_algo(file, target_column=None, test_size=0.3, random_state=
             'model_id': model_id,
             'testSize': float(test_size),
             'alpha': float(alpha)
+        }
+
+    except Exception as e:
+        return {'error': str(e)}
+    
+def svm_classifier_algo(
+    file, 
+    target_column=None, 
+    test_size=0.3, 
+    random_state=43, 
+    cleaned_data=True,
+
+    # SVM-specific arguments
+    kernel="rbf",
+    C=1.0,
+    gamma="scale",
+    degree=3,
+    shrinking=True,
+    probability=True,
+    class_weight=None
+):
+    try:
+        # Read CSV or Excel
+        if file.name.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(file)
+        else:
+            df = pd.read_csv(io.BytesIO(file.read()))
+
+        if df.empty:
+            return {"error": "Uploaded file is empty."}
+
+        # FIX: Apply data cleaning if NOT cleaned_data
+        if not cleaned_data:
+            df, _ = clean_data(df=df)
+
+        # Use provided target_column or fallback to last column
+        if not target_column:
+            target_column = df.columns[-1]
+
+        if target_column not in df.columns:
+            return {"error": f"Target column '{target_column}' not found."}
+
+        X = df.drop(columns=[target_column])
+        y = df[target_column]
+
+        # Keep only numeric features
+        X = X.select_dtypes(include="number")
+
+        if X.empty:
+            return {"error": "No numeric features available after filtering."}
+
+        # Train/test split
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=random_state
+        )
+
+        # Build SVM model with arguments
+        model = SVC(
+            kernel=kernel,
+            C=C,
+            gamma=gamma,
+            degree=degree,
+            shrinking=shrinking,
+            probability=probability,
+            class_weight=class_weight,
+            random_state=random_state
+        )
+
+        model.fit(X_train, y_train)
+        preds = model.predict(X_test)
+
+        # Save trained model
+        model_id = f"svm_classifier_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        model_filename = f"{model_id}.pkl"
+        model_path = os.path.join('trained_models', model_filename)
+
+        os.makedirs('trained_models', exist_ok=True)
+
+        model_data = {
+            'model': model,
+            'feature_names': X.columns.tolist(),
+            'target_column': target_column,
+            'model_id': model_id,
+
+            # Store SVM args
+            'kernel': kernel,
+            'C': C,
+            'gamma': gamma,
+            'degree': degree,
+            'shrinking': shrinking,
+            'probability': probability,
+            'class_weight': class_weight
+        }
+
+        joblib.dump(model_data, model_path)
+
+        # Feature importance (only for linear kernel)
+        if kernel == "linear":
+            coefs = model.coef_[0]
+            feature_importance = dict(
+                sorted(
+                    zip(X.columns.tolist(), [float(c) for c in coefs]),
+                    key=lambda x: abs(x[1]),
+                    reverse=True
+                )[:5]
+            )
+        else:
+            feature_importance = "Not available for non-linear kernels"
+
+        return {
+            # Standard metrics
+            'accuracy': round(float(accuracy_score(y_test, preds)), 4),
+            'precision': round(float(precision_score(y_test, preds, average='weighted')), 4),
+            'recall': round(float(recall_score(y_test, preds, average='weighted')), 4),
+            'f1_score': round(float(f1_score(y_test, preds, average='weighted')), 4),
+
+            # Dataset info
+            'n_samples': len(df),
+            'n_features': X.shape[1],
+
+            # Feature importance
+            'top_features': feature_importance,
+
+            # Predictions
+            'predictions': [int(pred) for pred in preds],
+            'actual': [int(actual) for actual in y_test],
+
+            # Model info
+            'model_id': model_id,
+
+            # Returned SVM arguments
+            'kernel': kernel,
+            'C': float(C),
+            'gamma': gamma,
+            'degree': int(degree),
+            'shrinking': bool(shrinking),
+            'probability': bool(probability),
+            'class_weight': class_weight,
+
+            'testSize': float(test_size)
         }
 
     except Exception as e:
