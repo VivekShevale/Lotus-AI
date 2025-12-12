@@ -6,10 +6,12 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from math import sqrt
+import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.svm import SVC
+from sklearn.linear_model import Lasso
 import os
 import joblib
 from datetime import datetime
@@ -967,3 +969,132 @@ def svm_classifier_algo(
 
     except Exception as e:
         return {'error': str(e)}
+
+
+
+def lasso_regression_algo(
+    file,
+    target_column=None,
+    test_size=0.3,
+    random_state=101,
+    cleaned_data=True,
+    alpha=1.0,          # Regularization strength
+    max_iter=1000
+):
+    try:
+        # Read CSV or Excel
+        if file.name.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(file)
+        else:
+            file.seek(0)
+            df = pd.read_csv(io.BytesIO(file.read()))
+
+        if df.empty:
+            return {"error": "Uploaded file is empty."}
+
+        # Data cleaning
+        if not cleaned_data:
+            df, _ = clean_data(df=df)
+
+        # Target column
+        if not target_column:
+            target_column = df.columns[-1]
+
+        if target_column not in df.columns:
+            return {"error": f"Target column '{target_column}' not found."}
+
+        X = df.drop(columns=[target_column])
+        y = df[target_column]
+
+        # Keep only numeric features
+        X = X.select_dtypes(include="number")
+
+        if X.empty:
+            return {"error": "No numeric features available after preprocessing."}
+
+        # Train / test split
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=random_state
+        )
+
+        # Feature scaling (important for Lasso)
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_test_scaled = scaler.transform(X_test)
+
+        # Build Lasso Regression
+        model = Lasso(alpha=alpha, max_iter=max_iter, random_state=random_state)
+        model.fit(X_train_scaled, y_train)
+
+        preds = model.predict(X_test_scaled)
+
+        # Save model
+        model_id = f"lasso_regression_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        model_filename = f"{model_id}.pkl"
+        model_path = os.path.join("trained_models", model_filename)
+        os.makedirs("trained_models", exist_ok=True)
+
+        model_data = {
+            'model': model,
+            'scaler': scaler,
+            'feature_names': X.columns.tolist(),
+            'target_column': target_column,
+            'model_id': model_id,
+            'config': {
+                "alpha": alpha,
+                "max_iter": max_iter
+            }
+        }
+
+        joblib.dump(model_data, model_path)
+
+        # Metrics
+        mse = mean_squared_error(y_test, preds)
+        rmse = float(np.sqrt(mse)) 
+        mae = mean_absolute_error(y_test, preds)
+        r2 = r2_score(y_test, preds)
+
+        # Feature coefficients
+        coef_dict = dict(zip(X.columns.tolist(), model.coef_))
+        top_features = dict(sorted(coef_dict.items(), key=lambda x: abs(x[1]), reverse=True)[:5])
+
+        # Prepare prediction data
+        prediction_data = []
+        for i, (pred, actual) in enumerate(zip(preds, y_test)):
+            prediction_data.append({
+                'index': i + 1,
+                'prediction': float(pred),
+                'actual': float(actual),
+                'error': float(actual - pred)
+            })
+
+        return {
+            "mse": float(mse),
+            "rmse": float(rmse),
+            "mae": float(mae),
+            "r2_score": float(r2),
+
+            "n_samples": int(len(df)),
+            "n_features": int(X.shape[1]),
+
+            "feature_coefficients": coef_dict,
+            "top_features": top_features,
+
+            "predictions": [float(p) for p in preds],
+            "actual": [float(a) for a in y_test],
+
+            "prediction_data": prediction_data,
+            
+            "model_id": model_id,
+            "testSize": float(test_size),
+            "train_samples": int(len(X_train)),
+            "test_samples": int(len(X_test)),
+            "feature_names": X.columns.tolist(),
+
+            # Training info
+            "alpha": alpha,
+            "max_iter": max_iter
+        }
+
+    except Exception as e:
+        return {"error": str(e)}

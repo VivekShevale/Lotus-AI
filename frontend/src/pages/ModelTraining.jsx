@@ -21,6 +21,8 @@ import RidgeRegressionForm from "../components/RidgeRegression/RidgeRegressionFo
 import RidgeRegressionResult from "../components/RidgeRegression/RidgeRegressionResult";
 import SVMForm from "../components/SVM/SVMForm";
 import SVMResult from "../components/SVM/SVMResult";
+import LassoRegressionForm from "../components/LassoRegression/LassoRegressionForm";
+import LassoRegressionResult from "../components/LassoRegression/LassoRegressionResult";
 
 export default function ModelTraining() {
   const { slug } = useParams();
@@ -63,7 +65,12 @@ export default function ModelTraining() {
   const [maxIter, setMaxIter] = useState(500);
 
   const [alpha, setAlpha] = useState(1.0);
-
+ 
+  // Lasso Regression specific states
+  const [fitIntercept, setFitIntercept] = useState(true);
+  const [tol, setTol] = useState(0.0001);
+  const [selection, setSelection] = useState("cyclic"); // "cyclic" or "random"
+  const [normalize, setNormalize] = useState(false);
   //import title
   const model = models.find((m) => m.slug === slug);
   if (!model) {
@@ -112,7 +119,8 @@ export default function ModelTraining() {
       model.slug === "random-forest" ||
       model.slug === "neural-network" ||
       model.slug === "ridge-regression" ||
-      model.slug === "support-vector-machine"
+      model.slug === "support-vector-machine" ||
+      model.slug === "lasso-regression"
     ) {
       formData.append("file", file);
       formData.append("target_column", targetColumn);
@@ -176,6 +184,15 @@ export default function ModelTraining() {
       if (classWeight !== "none") {
         formData.append("class_weight", classWeight);
       }
+    }
+    if (model.slug === "lasso-regression") {
+      // Lasso Regression specific parameters
+      formData.append("alpha", alpha || 1.0);
+      formData.append("fit_intercept", fitIntercept);
+      formData.append("max_iter", maxIter || 1000);
+      formData.append("tol", tol || 0.0001);
+      formData.append("selection", selection || "cyclic");
+      formData.append("normalize", normalize);
     }
     try {
       const res = await api.post("/api/perform", formData, {
@@ -570,6 +587,42 @@ export default function ModelTraining() {
                     setClassWeight={setClassWeight}
                   />
                 )}
+                {model.slug === "lasso-regression" && (
+                  <LassoRegressionForm
+                    onFileChange={setFile}
+                    onTargetChange={handleTargetChange}
+                    targetColumn={targetColumn}
+                    columns={columns}
+                    setResult={setResult}
+                    setError={setError}
+                    testSize={testSize}
+                    setTestSize={setTestSize}
+                    randomState={randomState}
+                    setRandomState={setRandomState}
+                    loading={loading}
+                    downloadLoading={downloadLoading}
+                    isTrained={isTrained}
+                    file={file}
+                    onTrain={handleSubmit}
+                    onDownload={handleDownloadModel}
+                    enableDataCleaning={enableDataCleaning}
+                    setEnableDataCleaning={setEnableDataCleaning}
+                    // Lasso Regression specific props
+                    alpha={alpha}
+                    setAlpha={setAlpha}
+                    fitIntercept={fitIntercept}
+                    setFitIntercept={setFitIntercept}
+                    maxIter={maxIter}
+                    setMaxIter={setMaxIter}
+                    tol={tol}
+                    setTol={setTol}
+                    selection={selection}
+                    setSelection={setSelection}
+                    normalize={normalize}
+                    setNormalize={setNormalize}
+                  />
+                )}
+
               </div>
 
               {/* Prediction Results - Full width below the form */}
@@ -617,6 +670,13 @@ export default function ModelTraining() {
                 )}
                 {model.slug == "support-vector-machine" && result && (
                   <SVMResult
+                    result={result}
+                    error={error}
+                    targetColumn={targetColumn}
+                  />
+                )}
+                {model.slug == "lasso-regression" && (
+                  <LassoRegressionResult
                     result={result}
                     error={error}
                     targetColumn={targetColumn}

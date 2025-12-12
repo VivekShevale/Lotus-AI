@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo, ridge_regression_algo, svm_classifier_algo
+from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo, ridge_regression_algo, svm_classifier_algo, lasso_regression_algo
 from app.services.neural_services import neural_network_regression_algo    
 
 def model_training():
@@ -159,6 +159,24 @@ def model_training():
             if class_weight in [None, "", "null", "None"]:
                 class_weight = None
             # allowed: None, "balanced"
+            
+            
+        elif model == "lasso-regression":
+    
+            # alpha (float)
+            alpha = request.form.get("alpha")
+            if alpha in [None, "", "null"]:
+                alpha = 1.0           # default value
+            else:
+                alpha = float(alpha)
+
+            # max_iter (int)
+            max_iter = request.form.get("max_iter")
+            if max_iter in [None, "", "null"]:
+                max_iter = 1000       # default value
+            else:
+                max_iter = int(max_iter)
+
 
             
         
@@ -169,8 +187,6 @@ def model_training():
                 result = linear_regression_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning)
             case "logistic-regression":
                 result = logistic_regression_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning)
-            case "decision-tree":
-                result = decision_tree_classifier_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning, criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf)
             case "KNN":
                 result = knn_classifier_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning, n_neighbors=n_neighbors, weights=weights, algorithm=algorithm, metric=metric)
             case "random-forest":
@@ -181,6 +197,8 @@ def model_training():
                 result = ridge_regression_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning, alpha=alpha)
             case "support-vector-machine":
                 result = svm_classifier_algo(f,target_column,test_size,random_state,cleaned_data=not enable_data_cleaning,kernel=kernel,C=C,gamma=gamma,degree=degree,shrinking=shrinking,probability=probability,class_weight=class_weight)
+            case "lasso-regression":
+                result = lasso_regression_algo(f,target_column,test_size,random_state,cleaned_data = not enable_data_cleaning,alpha = alpha,max_iter = max_iter)
             case _:  # default case
                 raise ValueError(f"Unknown model: {model}")
     
