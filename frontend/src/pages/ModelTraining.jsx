@@ -202,6 +202,7 @@ export default function ModelTraining() {
       formData.append("learning_rate", learningRate);
       formData.append("model_architecture", modelArchitecture);
       formData.append("data_augmentation", enableDataAugmentation);
+    }
     if (model.slug === "support-vector-machine") {
       // SVM Classifier specific parameters
       formData.append("C", svmC);
@@ -689,7 +690,6 @@ export default function ModelTraining() {
                     setNormalize={setNormalize}
                   />
                 )}
-
               </div>
 
               {/* Prediction Results - Full width below the form */}
@@ -766,4 +766,4 @@ export default function ModelTraining() {
       </div>
     </div>
   );
-}
+  }

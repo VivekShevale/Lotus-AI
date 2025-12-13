@@ -26,7 +26,6 @@ def model_training():
             min_samples_split = int(request.form.get('min_samples_split'))
             min_samples_leaf = int(request.form.get('min_samples_leaf'))
 
-        
         elif model == "KNN":
             # n_neighbors (int)
             n_neighbors = request.form.get("n_neighbors")
@@ -205,6 +204,8 @@ def model_training():
                 result = logistic_regression_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning)
             case "KNN":
                 result = knn_classifier_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning, n_neighbors=n_neighbors, weights=weights, algorithm=algorithm, metric=metric)
+            case "decision-tree":
+                result = decision_tree_classifier_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning, criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf)
             case "random-forest":
                 result = random_forest_classifier_algo(f, target_column, test_size, random_state, cleaned_data =not enable_data_cleaning, n_estimators=n_estimators, criterion=criterion, max_depth=max_depth, min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf, class_weight=class_weight)
             case "neural-network":
