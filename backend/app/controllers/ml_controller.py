@@ -1,22 +1,23 @@
 from flask import request, jsonify
 from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo, ridge_regression_algo
 from app.services.neural_services import neural_network_regression_algo    
+from app.services.image_classifier import train_image_classifier
 
 def model_training():
     try:
-        if 'file' not in request.files:
+        if ('file' not in request.files) and ('dataset' not in request.files):
             return jsonify({'error': 'No file uploaded'}), 400
-
-        f = request.files['file']
-        target_column = request.form.get('target_column')  # get frontend selected column
-        random_state = int(request.form.get('random_state'))
-        test_size = float(request.form.get('test_size'))
-        enable_data_cleaning = request.form.get('enable_data_cleaning', 'true').lower() == 'true'
+        
+        if 'file' in request.files:
+            f = request.files['file']
+            target_column = request.form.get('target_column')  # get frontend selected column
+            random_state = int(request.form.get('random_state'))
+            test_size = float(request.form.get('test_size'))
+            enable_data_cleaning = request.form.get('enable_data_cleaning', 'true').lower() == 'true'
 
         # Decision Tree specific arguments
         model=request.form.get('model')
         if model == "decision-tree":
-            
             criterion = request.form.get('criterion')
             if criterion in [None, "", "null"]:
                 criterion = "gini"   # default allowed value
@@ -25,10 +26,6 @@ def model_training():
             min_samples_split = int(request.form.get('min_samples_split'))
             min_samples_leaf = int(request.form.get('min_samples_leaf'))
 
-        # Convert numeric fields safely
-        # max_depth = int(max_depth) if max_depth not in [None, "", "null"] else None
-        # min_samples_split = int(min_samples_split) if min_samples_split not in [None, "", "null"] else 2
-        # min_samples_leaf = int(min_samples_leaf) if min_samples_leaf not in [None, "", "null"] else 1
         
         elif model == "KNN":
             # n_neighbors (int)
@@ -106,10 +103,31 @@ def model_training():
 
         elif model=="ridge-regression":
             alpha = float(request.form.get('alpha'))
+
+        elif model=="image-classifier":
+            import tempfile, zipfile, os
+            zip_file = request.files["dataset"]
+            temp_dir = tempfile.mkdtemp()
+
+            zip_path = os.path.join(temp_dir, "dataset.zip")
+            zip_file.save(zip_path)
+
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+
+            dataset_path = temp_dir
+
+            # Read parameters
+            img_size_raw = request.form.get("img_size", "224,224")
+            img_size = tuple(map(int, img_size_raw.replace("x", ",").split(",")))
+
+            batch_size = int(request.form.get("batch_size", 32))
+            epochs = int(request.form.get("epochs", 10))
+            learning_rate = float(request.form.get("learning_rate", 0.0001))
+
+            model_architecture = request.form.get("model_architecture", "EfficientNet")
+            data_augmentation = request.form.get("data_augmentation", "true") == "true"
             
-        
-        # Pass target_column to process_csv
-        model = request.form.get('model')
         match (model):
             case "linear-regression":
                 result = linear_regression_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning)
@@ -126,6 +144,16 @@ def model_training():
                                    hidden_layer_sizes=hidden_layer_sizes, activation=activation, solver=solver, max_iter=max_iter)
             case "ridge-regression":
                 result = ridge_regression_algo(f, target_column, test_size, random_state, cleaned_data=not enable_data_cleaning, alpha=alpha)
+            case "image-classifier":
+                result = train_image_classifier(
+                    dataset_path,
+                    # img_size=(24, 24),
+                    batch_size=batch_size,
+                    epochs=epochs,
+                    learning_rate=learning_rate,
+                )
+
+
             case _:  # default case
                 raise ValueError(f"Unknown model: {model}")
     

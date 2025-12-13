@@ -11,6 +11,7 @@ import {
   LeafIcon,
   TreesIcon,
   Sun,
+  CrownIcon, // Added CrownIcon for exclusive badge
 } from "lucide-react";
 
 const ModelsPage = () => {
@@ -142,12 +143,25 @@ const ModelsPage = () => {
                         <ModelIcon className="w-5 h-5 text-white" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 text-sm truncate">
-                          {model.name}
-                        </h3>
-                        <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">
-                          {model.library}
-                        </p>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 text-sm truncate">
+                              {model.name}
+                            </h3>
+                            <p className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                              {model.library}
+                            </p>
+                          </div>
+                          {/* Exclusive Badge */}
+                          {model.Exclusive && (
+                            <div className="flex-shrink-0">
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-medium">
+                                <CrownIcon className="w-2.5 h-2.5" />
+                                Exclusive
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -212,17 +226,11 @@ const ModelsPage = () => {
             );
           })}
         </div>
+        
         {/* Empty State */}
-        {/* import {Leaf} from "lucide-react";
-        <div className="w-20 h-20 flex items-center justify-center mx-auto mb-6 border-2 border-emerald-300 dark:border-emerald-500 rounded-2xl hover:bg-emerald-100 dark:hover:bg-emerald-800 transition-colors duration-300">
-          <Leaf
-            className="w-10 h-10 text-emerald-500 dark:text-emerald-300"
-            aria-hidden="true"
-          />
-        </div> */}
         {filteredModels.length === 0 && (
           <div className="text-center py-16">
-            <div className="w-20 h-20 bg-yellow-200 dark:bg-yellow-900/40 rounded-full flex items-center justify-center mx-auto mb-6  transition-shadow duration-300">
+            <div className="w-20 h-20 bg-yellow-200 dark:bg-yellow-900/40 rounded-full flex items-center justify-center mx-auto mb-6 transition-shadow duration-300">
               <Sun
                 className="w-10 h-10 text-yellow-500 dark:text-yellow-300"
                 aria-hidden="true"
@@ -237,6 +245,7 @@ const ModelsPage = () => {
             </p>
           </div>
         )}
+        
         {/* Category Filter Chips */}
         <div className="flex flex-wrap gap-2 mt-6 justify-center">
           {categories.map((category) => {

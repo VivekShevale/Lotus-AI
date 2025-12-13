@@ -19,6 +19,8 @@ import NeuralNetworkForm from "../components/NeuralRegressor/RegressorForm";
 import NeuralNetworkResult from "../components/NeuralRegressor/RegressorResult";
 import RidgeRegressionForm from "../components/RidgeRegression/RidgeRegressionForm";
 import RidgeRegressionResult from "../components/RidgeRegression/RidgeRegressionResult";
+import ImageClassificationForm from "../components/ImageClassification/ImageClassificationForm";
+import ImageClassificationResult from "../components/ImageClassification/ImageClassificationResult";
 
 export default function ModelTraining() {
   const { slug } = useParams();
@@ -55,6 +57,18 @@ export default function ModelTraining() {
 
   const [alpha, setAlpha] = useState(1.0);
 
+  //Image Classifier
+  const [dataset, setDataset] = useState(null);
+  const [datasetInfo, setDatasetInfo] = useState(null);
+  const [enableDataAugmentation, setEnableDataAugmentation] = useState(true);
+
+  // Image Classification specific state
+  const [imgSize, setImgSize] = useState(224);
+  const [batchSize, setBatchSize] = useState(32);
+  const [epochs, setEpochs] = useState(10);
+  const [learningRate, setLearningRate] = useState(0.0001);
+  const [modelArchitecture, setModelArchitecture] = useState("efficientnet_b0");
+
   //import title
   const model = models.find((m) => m.slug === slug);
   if (!model) {
@@ -81,13 +95,32 @@ export default function ModelTraining() {
     setTargetColumn(value);
   };
 
+  const handleDatasetChange = (file) => {
+    setDataset(file);
+    setIsTrained(false);
+    setResult(null);
+    setError(null);
+
+    // Extract basic info
+    if (file) {
+      setDatasetInfo({
+        name: file.name.replace(".zip", ""),
+        size: (file.size / (1024 * 1024)).toFixed(2) + " MB",
+        type: "Image Dataset (ZIP)",
+        uploadedAt: new Date().toLocaleString(),
+      });
+    }
+  };
+
   // Handle form submission for training - UPDATED
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!file) return setError("Please select a file.");
-    if (!targetColumn) return setError("Please select a target column.");
+    if (model.slug !== "image-classifier") {
+      if (!file) return setError("Please select a file.");
 
+      if (!targetColumn) return setError("Please select a target column.");
+    }
     setLoading(true);
     setError(null);
     setResult(null);
@@ -141,6 +174,15 @@ export default function ModelTraining() {
     }
     if (model.slug === "ridge-regression") {
       formData.append("alpha", alpha);
+    }
+    if (model.slug === "image-classifier") {
+      formData.append("dataset", dataset);
+      formData.append("img_size", imgSize);
+      formData.append("batch_size", batchSize);
+      formData.append("epochs", epochs);
+      formData.append("learning_rate", learningRate);
+      formData.append("model_architecture", modelArchitecture);
+      formData.append("data_augmentation", enableDataAugmentation);
     }
     try {
       const res = await api.post("/api/perform", formData, {
@@ -496,6 +538,31 @@ export default function ModelTraining() {
                     setAlpha={setAlpha}
                   />
                 )}
+                {model.slug === "image-classifier" && (
+                  <ImageClassificationForm
+                    onDatasetChange={handleDatasetChange}
+                    dataset={dataset}
+                    setError={setError}
+                    setResult={setResult}
+                    loading={loading}
+                    downloadLoading={downloadLoading}
+                    isTrained={isTrained}
+                    onTrain={handleSubmit}
+                    onDownload={handleDownloadModel}
+                    enableDataAugmentation={enableDataAugmentation}
+                    setEnableDataAugmentation={setEnableDataAugmentation}
+                    imgSize={imgSize}
+                    setImgSize={setImgSize}
+                    batchSize={batchSize}
+                    setBatchSize={setBatchSize}
+                    epochs={epochs}
+                    setEpochs={setEpochs}
+                    learningRate={learningRate}
+                    setLearningRate={setLearningRate}
+                    modelArchitecture={modelArchitecture}
+                    setModelArchitecture={setModelArchitecture}
+                  />
+                )}
               </div>
 
               {/* Prediction Results - Full width below the form */}
@@ -539,6 +606,13 @@ export default function ModelTraining() {
                     result={result}
                     error={error}
                     targetColumn={targetColumn}
+                  />
+                )}
+                {model.slug === "image-classifier" && (
+                  <ImageClassificationResult
+                    result={result}
+                    error={error}
+                    datasetInfo={datasetInfo}
                   />
                 )}
               </div>

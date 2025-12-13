@@ -1,4 +1,6 @@
 import {
+  Camera,
+  SunIcon,
   FlowerIcon,
   Leaf,
   LeafIcon,
@@ -12,6 +14,7 @@ export const icons = {
   clustering: TreesIcon,
   ensemble: TreesIcon,
   neural: LeafIcon,
+  imageClassification: SunIcon,
 };
 
 export const colors = {
@@ -20,6 +23,7 @@ export const colors = {
   clustering: "from-fuchsia-400 to-pink-500",
   ensemble: "from-amber-400 to-orange-500",
   neural: "from-rose-400 to-pink-500",
+  imageClassification: "from-blue-400 to-cyan-500",
 };
 
 export const models = [
@@ -372,7 +376,11 @@ export const models = [
       "Probabilistic classifier based on Bayes’ theorem, assuming independence among features. Simple, fast, and effective for text and categorical data.",
     category: "classification",
     trainingTime: "Fast",
-    useCases: ["Spam detection", "Sentiment analysis", "Document classification"],
+    useCases: [
+      "Spam detection",
+      "Sentiment analysis",
+      "Document classification",
+    ],
     slug: "naive-bayes",
     howItWorks:
       "Naive Bayes applies Bayes’ theorem to compute the probability of classes given feature values, assuming each feature contributes independently to the outcome.",
@@ -381,5 +389,33 @@ export const models = [
       "High-dimensional data",
       "Real-time predictions",
     ],
+  },
+  {
+    id: 19,
+    name: "Image Classifier (CNN)",
+    library: "tensorflow",
+    description:
+      "Deep learning model for classifying images using Convolutional Neural Networks and transfer learning. Supports medium and large datasets efficiently.",
+    category: "imageClassification",
+    trainingTime: "Medium to Slow",
+    useCases: [
+      "Object detection",
+      "Medical imaging",
+      "Wildlife recognition",
+      "Plant species classification",
+    ],
+    slug: "image-classifier",
+    howItWorks:
+      "The Image Classifier uses Convolutional Neural Networks (CNNs) or transfer learning models like EfficientNet/ResNet to learn spatial patterns in images. Images are resized, normalized, and fed through convolutional layers to extract features and classify them.",
+    bestFor: [
+      "Image datasets of any size",
+      "Complex pattern recognition",
+      "Large-scale classification",
+      "Non-linear feature extraction",
+    ],
+    icon: Camera,
+    class:
+      "w-10 h-10 bg-gradient-to-br from-green-500 to-indigo-600 rounded-lg flex items-center justify-center",
+    Exclusive: true,
   },
 ];
