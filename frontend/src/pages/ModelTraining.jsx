@@ -21,6 +21,10 @@ import RidgeRegressionForm from "../components/RidgeRegression/RidgeRegressionFo
 import RidgeRegressionResult from "../components/RidgeRegression/RidgeRegressionResult";
 import ImageClassificationForm from "../components/ImageClassification/ImageClassificationForm";
 import ImageClassificationResult from "../components/ImageClassification/ImageClassificationResult";
+import SVMForm from "../components/SVM/SVMForm";
+import SVMResult from "../components/SVM/SVMResult";
+import LassoRegressionForm from "../components/LassoRegression/LassoRegressionForm";
+import LassoRegressionResult from "../components/LassoRegression/LassoRegressionResult";
 
 export default function ModelTraining() {
   const { slug } = useParams();
@@ -48,7 +52,14 @@ export default function ModelTraining() {
   const [metric, setMetric] = useState("minkowski");
   const [nEstimators, setNEstimators] = useState(100);
   const [classWeight, setClassWeight] = useState(null);
-
+  // SVM
+  const [svmC, setSvmC] = useState(1.0);
+  const [kernel, setKernel] = useState("rbf");
+  const [gamma, setGamma] = useState("scale");
+  const [customGamma, setCustomGamma] = useState(0.1);
+  const [degree, setDegree] = useState(3);
+  const [shrinking, setShrinking] = useState(true);
+  const [probability, setProbability] = useState(false);
   //neural-network-regressor
   const [hiddenLayerSizes, setHiddenLayerSizes] = useState("100");
   const [activation, setActivation] = useState("relu");
@@ -69,6 +80,12 @@ export default function ModelTraining() {
   const [learningRate, setLearningRate] = useState(0.0001);
   const [modelArchitecture, setModelArchitecture] = useState("efficientnet_b0");
 
+ 
+  // Lasso Regression specific states
+  const [fitIntercept, setFitIntercept] = useState(true);
+  const [tol, setTol] = useState(0.0001);
+  const [selection, setSelection] = useState("cyclic"); // "cyclic" or "random"
+  const [normalize, setNormalize] = useState(false);
   //import title
   const model = models.find((m) => m.slug === slug);
   if (!model) {
@@ -135,7 +152,9 @@ export default function ModelTraining() {
       model.slug === "KNN" ||
       model.slug === "random-forest" ||
       model.slug === "neural-network" ||
-      model.slug === "ridge-regression"
+      model.slug === "ridge-regression" ||
+      model.slug === "support-vector-machine" ||
+      model.slug === "lasso-regression"
     ) {
       formData.append("file", file);
       formData.append("target_column", targetColumn);
@@ -183,6 +202,39 @@ export default function ModelTraining() {
       formData.append("learning_rate", learningRate);
       formData.append("model_architecture", modelArchitecture);
       formData.append("data_augmentation", enableDataAugmentation);
+    if (model.slug === "support-vector-machine") {
+      // SVM Classifier specific parameters
+      formData.append("C", svmC);
+      formData.append("kernel", kernel);
+
+      // Handle gamma parameter
+      if (gamma === "custom" && customGamma) {
+        formData.append("gamma", customGamma);
+      } else {
+        formData.append("gamma", gamma);
+      }
+
+      // Only append degree if kernel is polynomial
+      if (kernel === "poly") {
+        formData.append("degree", degree);
+      }
+
+      formData.append("shrinking", shrinking);
+      formData.append("probability", probability);
+
+      // Only append class_weight if not "none"
+      if (classWeight !== "none") {
+        formData.append("class_weight", classWeight);
+      }
+    }
+    if (model.slug === "lasso-regression") {
+      // Lasso Regression specific parameters
+      formData.append("alpha", alpha || 1.0);
+      formData.append("fit_intercept", fitIntercept);
+      formData.append("max_iter", maxIter || 1000);
+      formData.append("tol", tol || 0.0001);
+      formData.append("selection", selection || "cyclic");
+      formData.append("normalize", normalize);
     }
     try {
       const res = await api.post("/api/perform", formData, {
@@ -563,6 +615,81 @@ export default function ModelTraining() {
                     setModelArchitecture={setModelArchitecture}
                   />
                 )}
+                {model.slug == "support-vector-machine" && (
+                  <SVMForm
+                    onFileChange={setFile}
+                    onTargetChange={handleTargetChange}
+                    targetColumn={targetColumn}
+                    columns={columns}
+                    setResult={setResult}
+                    setError={setError}
+                    testSize={testSize}
+                    setTestSize={setTestSize}
+                    randomState={randomState}
+                    setRandomState={setRandomState}
+                    loading={loading}
+                    downloadLoading={downloadLoading}
+                    isTrained={isTrained}
+                    file={file}
+                    onTrain={handleSubmit}
+                    onDownload={handleDownloadModel}
+                    enableDataCleaning={enableDataCleaning}
+                    setEnableDataCleaning={setEnableDataCleaning}
+                    // SVM specific props
+                    svmC={svmC}
+                    setSvmC={setSvmC}
+                    kernel={kernel}
+                    setKernel={setKernel}
+                    gamma={gamma}
+                    setGamma={setGamma}
+                    customGamma={customGamma}
+                    setCustomGamma={setCustomGamma}
+                    degree={degree}
+                    setDegree={setDegree}
+                    shrinking={shrinking}
+                    setShrinking={setShrinking}
+                    probability={probability}
+                    setProbability={setProbability}
+                    classWeight={classWeight}
+                    setClassWeight={setClassWeight}
+                  />
+                )}
+                {model.slug === "lasso-regression" && (
+                  <LassoRegressionForm
+                    onFileChange={setFile}
+                    onTargetChange={handleTargetChange}
+                    targetColumn={targetColumn}
+                    columns={columns}
+                    setResult={setResult}
+                    setError={setError}
+                    testSize={testSize}
+                    setTestSize={setTestSize}
+                    randomState={randomState}
+                    setRandomState={setRandomState}
+                    loading={loading}
+                    downloadLoading={downloadLoading}
+                    isTrained={isTrained}
+                    file={file}
+                    onTrain={handleSubmit}
+                    onDownload={handleDownloadModel}
+                    enableDataCleaning={enableDataCleaning}
+                    setEnableDataCleaning={setEnableDataCleaning}
+                    // Lasso Regression specific props
+                    alpha={alpha}
+                    setAlpha={setAlpha}
+                    fitIntercept={fitIntercept}
+                    setFitIntercept={setFitIntercept}
+                    maxIter={maxIter}
+                    setMaxIter={setMaxIter}
+                    tol={tol}
+                    setTol={setTol}
+                    selection={selection}
+                    setSelection={setSelection}
+                    normalize={normalize}
+                    setNormalize={setNormalize}
+                  />
+                )}
+
               </div>
 
               {/* Prediction Results - Full width below the form */}
@@ -613,6 +740,20 @@ export default function ModelTraining() {
                     result={result}
                     error={error}
                     datasetInfo={datasetInfo}
+                    />
+                )}
+                {model.slug == "support-vector-machine" && result && (
+                  <SVMResult
+                    result={result}
+                    error={error}
+                    targetColumn={targetColumn}
+                  />
+                )}
+                {model.slug == "lasso-regression" && (
+                  <LassoRegressionResult
+                    result={result}
+                    error={error}
+                    targetColumn={targetColumn}
                   />
                 )}
               </div>
