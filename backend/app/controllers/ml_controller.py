@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo, ridge_regression_algo, svm_classifier_algo, lasso_regression_algo
+from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo, ridge_regression_algo, svm_classifier_algo, lasso_regression_algo, elastic_net_regression_algo
 from app.services.neural_services import neural_network_regression_algo    
 from app.services.image_classifier import train_image_classifier
 
@@ -194,6 +194,29 @@ def model_training():
                 max_iter = 1000       # default value
             else:
                 max_iter = int(max_iter)
+                
+        elif model == "elastic-net":
+        # alpha (float)
+            alpha = request.form.get("alpha")
+            if alpha in [None, "", "null"]:
+                alpha = 1.0          # default value
+            else:
+                alpha = float(alpha)
+
+            # l1_ratio (float)
+            l1_ratio = request.form.get("l1_ratio")
+            if l1_ratio in [None, "", "null"]:
+                l1_ratio = 0.5       # default: equal L1 & L2
+            else:
+                l1_ratio = float(l1_ratio)
+
+            # max_iter (int)
+            max_iter = request.form.get("max_iter")
+            if max_iter in [None, "", "null"]:
+                max_iter = 1000      # default value
+            else:
+                max_iter = int(max_iter)
+
         
         # Pass target_column to process_csv
         model = request.form.get('model')
@@ -224,6 +247,8 @@ def model_training():
                 result = svm_classifier_algo(f,target_column,test_size,random_state,cleaned_data=not enable_data_cleaning,kernel=kernel,C=C,gamma=gamma,degree=degree,shrinking=shrinking,probability=probability,class_weight=class_weight)
             case "lasso-regression":
                 result = lasso_regression_algo(f,target_column,test_size,random_state,cleaned_data = not enable_data_cleaning,alpha = alpha,max_iter = max_iter)
+            case "elastic-net":
+                result = elastic_net_regression_algo(f,target_column,test_size,random_state,cleaned_data=not enable_data_cleaning,alpha=alpha,l1_ratio=l1_ratio,max_iter=max_iter)
             case _:  # default case
                 raise ValueError(f"Unknown model: {model}")
     

@@ -25,6 +25,8 @@ import SVMForm from "../components/SVM/SVMForm";
 import SVMResult from "../components/SVM/SVMResult";
 import LassoRegressionForm from "../components/LassoRegression/LassoRegressionForm";
 import LassoRegressionResult from "../components/LassoRegression/LassoRegressionResult";
+import ElasticNetForm from "../components/ElasticNetRegression/ElasticNetForm";
+import ElasticNetResult from "../components/ElasticNetRegression/ElasticNetResult";
 
 export default function ModelTraining() {
   const { slug } = useParams();
@@ -86,6 +88,11 @@ export default function ModelTraining() {
   const [tol, setTol] = useState(0.0001);
   const [selection, setSelection] = useState("cyclic"); // "cyclic" or "random"
   const [normalize, setNormalize] = useState(false);
+
+  
+  // ElasticNet specific states
+  const [l1Ratio, setL1Ratio] = useState(0.5); // L1/L2 balance (0-1)
+
   //import title
   const model = models.find((m) => m.slug === slug);
   if (!model) {
@@ -154,7 +161,8 @@ export default function ModelTraining() {
       model.slug === "neural-network" ||
       model.slug === "ridge-regression" ||
       model.slug === "support-vector-machine" ||
-      model.slug === "lasso-regression"
+      model.slug === "lasso-regression" ||
+      model.slug === "elastic-net"
     ) {
       formData.append("file", file);
       formData.append("target_column", targetColumn);
@@ -233,6 +241,16 @@ export default function ModelTraining() {
       formData.append("alpha", alpha || 1.0);
       formData.append("fit_intercept", fitIntercept);
       formData.append("max_iter", maxIter || 1000);
+      formData.append("tol", tol || 0.0001);
+      formData.append("selection", selection || "cyclic");
+      formData.append("normalize", normalize);
+    }
+    if (model.slug === "elastic-net") {
+      // ElasticNet specific parameters
+      formData.append("alpha", alpha || 1.0);
+      formData.append("l1_ratio", l1Ratio || 0.5);
+      formData.append("max_iter", maxIter || 1000);
+      formData.append("fit_intercept", fitIntercept);
       formData.append("tol", tol || 0.0001);
       formData.append("selection", selection || "cyclic");
       formData.append("normalize", normalize);
@@ -690,6 +708,43 @@ export default function ModelTraining() {
                     setNormalize={setNormalize}
                   />
                 )}
+                {model.slug === "elastic-net" && (
+                  <ElasticNetForm
+                    onFileChange={setFile}
+                    onTargetChange={handleTargetChange}
+                    targetColumn={targetColumn}
+                    columns={columns}
+                    setResult={setResult}
+                    setError={setError}
+                    testSize={testSize}
+                    setTestSize={setTestSize}
+                    randomState={randomState}
+                    setRandomState={setRandomState}
+                    loading={loading}
+                    downloadLoading={downloadLoading}
+                    isTrained={isTrained}
+                    file={file}
+                    onTrain={handleSubmit}
+                    onDownload={handleDownloadModel}
+                    enableDataCleaning={enableDataCleaning}
+                    setEnableDataCleaning={setEnableDataCleaning}
+                    // ElasticNet specific props
+                    alpha={alpha}
+                    setAlpha={setAlpha}
+                    l1Ratio={l1Ratio}
+                    setL1Ratio={setL1Ratio}
+                    maxIter={maxIter}
+                    setMaxIter={setMaxIter}
+                    fitIntercept={fitIntercept}
+                    setFitIntercept={setFitIntercept}
+                    tol={tol}
+                    setTol={setTol}
+                    selection={selection}
+                    setSelection={setSelection}
+                    normalize={normalize}
+                    setNormalize={setNormalize}
+                  />
+                )}
               </div>
 
               {/* Prediction Results - Full width below the form */}
@@ -751,6 +806,13 @@ export default function ModelTraining() {
                 )}
                 {model.slug == "lasso-regression" && (
                   <LassoRegressionResult
+                    result={result}
+                    error={error}
+                    targetColumn={targetColumn}
+                  />
+                )}
+                {model.slug == "elastic-net" && (
+                  <ElasticNetResult
                     result={result}
                     error={error}
                     targetColumn={targetColumn}
