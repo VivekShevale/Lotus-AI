@@ -7,7 +7,7 @@ from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from math import sqrt
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.svm import SVC
@@ -1236,5 +1236,150 @@ def elastic_net_regression_algo(
 
     except Exception as e:
         return {"error": str(e)}
+    
+def adaboost_classifier_algo(
+    file,
+    target_column=None,
+    test_size=0.3,
+    random_state=42,
+    cleaned_data=True,
+
+    # AdaBoost-specific arguments
+    n_estimators=50,
+    learning_rate=1.0,
+    algorithm="SAMME"
+):
+    try:
+        # ===============================
+        # 🔹 Read CSV or Excel
+        # ===============================
+        if file.name.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(file)
+        else:
+            file.seek(0)
+            df = pd.read_csv(io.BytesIO(file.read()))
+
+        if df.empty:
+            return {"error": "Uploaded file is empty."}
+
+        # ===============================
+        # 🔹 Data Cleaning
+        # ===============================
+        if not cleaned_data:
+            df, _ = clean_data(df=df)
+
+        # ===============================
+        # 🔹 Target Column
+        # ===============================
+        if not target_column:
+            target_column = df.columns[-1]
+
+        if target_column not in df.columns:
+            return {"error": f"Target column '{target_column}' not found."}
+
+        X = df.drop(columns=[target_column])
+        y = df[target_column]
+
+        # ===============================
+        # 🔹 Numeric Features Only
+        # ===============================
+        X = X.select_dtypes(include="number")
+
+        if X.empty:
+            return {"error": "No numeric features available after preprocessing."}
+
+        # ===============================
+        # 🔹 Train / Test Split
+        # ===============================
+        X_train, X_test, y_train, y_test = train_test_split(
+            X,
+            y,
+            test_size=test_size,
+            random_state=random_state,
+            stratify=y
+        )
+
+        # ===============================
+        # 🔹 Build AdaBoost Classifier
+        # ===============================
+        model = AdaBoostClassifier(
+            n_estimators=n_estimators,
+            learning_rate=learning_rate,
+            algorithm=algorithm,
+            random_state=random_state
+        )
+
+        model.fit(X_train, y_train)
+        preds = model.predict(X_test)
+
+        # ===============================
+        # 🔹 Save Trained Model
+        # ===============================
+        model_id = f"adaboost_classifier_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        model_filename = f"{model_id}.pkl"
+        model_path = os.path.join("trained_models", model_filename)
+
+        os.makedirs("trained_models", exist_ok=True)
+
+        model_data = {
+            "model": model,
+            "feature_names": X.columns.tolist(),
+            "target_column": target_column,
+            "model_id": model_id,
+
+            # AdaBoost configuration
+            "n_estimators": n_estimators,
+            "learning_rate": learning_rate,
+            "algorithm": algorithm
+        }
+
+        joblib.dump(model_data, model_path)
+
+        # ===============================
+        # 🔹 Feature Importance
+        # ===============================
+        feature_importance = dict(
+            sorted(
+                zip(X.columns.tolist(), model.feature_importances_),
+                key=lambda x: x[1],
+                reverse=True
+            )[:5]
+        )
+
+        # ===============================
+        # 🔹 Return Response
+        # ===============================
+        return {
+            # Metrics
+            "accuracy": round(float(accuracy_score(y_test, preds)), 4),
+            "precision": round(float(precision_score(y_test, preds, average="weighted")), 4),
+            "recall": round(float(recall_score(y_test, preds, average="weighted")), 4),
+            "f1_score": round(float(f1_score(y_test, preds, average="weighted")), 4),
+
+            # Dataset info
+            "n_samples": int(len(df)),
+            "n_features": int(X.shape[1]),
+
+            # Feature importance
+            "top_features": feature_importance,
+
+            # Predictions
+            "predictions": [int(p) for p in preds],
+            "actual": [int(a) for a in y_test],
+
+            # Model info
+            "model_id": model_id,
+
+            # AdaBoost parameters
+            "n_estimators": int(n_estimators),
+            "learning_rate": float(learning_rate),
+            "algorithm": algorithm,
+
+            "testSize": float(test_size)
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
+
     
     

@@ -27,6 +27,8 @@ import LassoRegressionForm from "../components/LassoRegression/LassoRegressionFo
 import LassoRegressionResult from "../components/LassoRegression/LassoRegressionResult";
 import ElasticNetForm from "../components/ElasticNetRegression/ElasticNetForm";
 import ElasticNetResult from "../components/ElasticNetRegression/ElasticNetResult";
+import AdaBoostResult from "../components/AdaBoostClassifier/AdaBoostResult";
+import AdaBoostForm from "../components/AdaBoostClassifier/AdaBoostForm";
 
 export default function ModelTraining() {
   const { slug } = useParams();
@@ -50,7 +52,7 @@ export default function ModelTraining() {
   const [minSamplesLeaf, setMinSamplesLeaf] = useState(1);
   const [nNeighbors, setNNeighbors] = useState(5);
   const [weights, setWeights] = useState("uniform");
-  const [algorithm, setAlgorithm] = useState("auto");
+  const [algorithm, setAlgorithm] = useState("auto");   
   const [metric, setMetric] = useState("minkowski");
   const [nEstimators, setNEstimators] = useState(100);
   const [classWeight, setClassWeight] = useState(null);
@@ -93,6 +95,8 @@ export default function ModelTraining() {
   // ElasticNet specific states
   const [l1Ratio, setL1Ratio] = useState(0.5); // L1/L2 balance (0-1)
 
+  // AdaBoost
+ 
   //import title
   const model = models.find((m) => m.slug === slug);
   if (!model) {
@@ -162,7 +166,8 @@ export default function ModelTraining() {
       model.slug === "ridge-regression" ||
       model.slug === "support-vector-machine" ||
       model.slug === "lasso-regression" ||
-      model.slug === "elastic-net"
+      model.slug === "elastic-net" ||
+      model.slug === "adaboost"
     ) {
       formData.append("file", file);
       formData.append("target_column", targetColumn);
@@ -254,6 +259,12 @@ export default function ModelTraining() {
       formData.append("tol", tol || 0.0001);
       formData.append("selection", selection || "cyclic");
       formData.append("normalize", normalize);
+    }
+    if (model.slug === "adaboost") {
+      // AdaBoost specific parameters
+      formData.append("n_estimators", nEstimators || 50);
+      formData.append("learning_rate", learningRate || 1.0);
+      formData.append("algorithm", algorithm || "SAMME");
     }
     try {
       const res = await api.post("/api/perform", formData, {
@@ -745,6 +756,35 @@ export default function ModelTraining() {
                     setNormalize={setNormalize}
                   />
                 )}
+                {model.slug === "adaboost" && (
+                  <AdaBoostForm
+                    onFileChange={setFile}
+                    onTargetChange={handleTargetChange}
+                    targetColumn={targetColumn}
+                    columns={columns}
+                    setResult={setResult}
+                    setError={setError}
+                    testSize={testSize}
+                    setTestSize={setTestSize}
+                    randomState={randomState}
+                    setRandomState={setRandomState}
+                    loading={loading}
+                    downloadLoading={downloadLoading}
+                    isTrained={isTrained}
+                    file={file}
+                    onTrain={handleSubmit}
+                    onDownload={handleDownloadModel}
+                    enableDataCleaning={enableDataCleaning}
+                    setEnableDataCleaning={setEnableDataCleaning}
+                    // AdaBoost specific props
+                    nEstimators={nEstimators}
+                    setNEstimators={setNEstimators}
+                    learningRate={learningRate}
+                    setLearningRate={setLearningRate}
+                    algorithm={algorithm}
+                    setAlgorithm={setAlgorithm}
+                  />
+                )}
               </div>
 
               {/* Prediction Results - Full width below the form */}
@@ -813,6 +853,13 @@ export default function ModelTraining() {
                 )}
                 {model.slug == "elastic-net" && (
                   <ElasticNetResult
+                    result={result}
+                    error={error}
+                    targetColumn={targetColumn}
+                  />
+                )}
+                {model.slug == "adaboost" && (
+                  <AdaBoostResult
                     result={result}
                     error={error}
                     targetColumn={targetColumn}
