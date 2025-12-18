@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo, ridge_regression_algo, svm_classifier_algo, lasso_regression_algo, elastic_net_regression_algo, adaboost_classifier_algo, gradient_boosting_classifier_algo
+from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo, ridge_regression_algo, svm_classifier_algo, lasso_regression_algo, elastic_net_regression_algo, adaboost_classifier_algo, gradient_boosting_classifier_algo, principal_component_analysis_algo
 from app.services.neural_services import neural_network_regression_algo    
 from app.services.image_classifier import train_image_classifier
 
@@ -294,10 +294,39 @@ def model_training():
                     max_features = float(max_features)
                 else:
                     max_features = int(max_features)
+                    
+        elif model == "principal-component-analysis":
+            # n_components (int or float)
+            n_components = request.form.get("n_components")
+            if n_components in [None, "", "null"]:
+                n_components = None     # default: all components
+            else:
+                # allow both int (e.g. 2) or float (e.g. 0.95)
+                if "." in n_components:
+                    n_components = float(n_components)
+                else:
+                    n_components = int(n_components)
+
+            # scale_data (boolean)
+            scale_data = request.form.get("scale_data")
+            if scale_data in [None, "", "null"]:
+                scale_data = True       # default
+            else:
+                scale_data = scale_data.lower() == "true"
+
+            # random_state (int)
+            random_state = request.form.get("random_state")
+            if random_state in [None, "", "null"]:
+                random_state = 101      # default
+            else:
+                random_state = int(random_state)
+
+            # target_column (optional – for visualization)
+            target_column = request.form.get("target_column")
+            if target_column in [None, "", "null"]:
+                target_column = None
 
 
-
-        
         # Pass target_column to process_csv
         model = request.form.get('model')
         match (model):
@@ -333,6 +362,8 @@ def model_training():
                 result = adaboost_classifier_algo(f,target_column,test_size,random_state,cleaned_data=not enable_data_cleaning,n_estimators=n_estimators,learning_rate=learning_rate,algorithm=algorithm)
             case "gradient-boosting":
                 result = gradient_boosting_classifier_algo(f,target_column,test_size,random_state,cleaned_data=not enable_data_cleaning,n_estimators=n_estimators,learning_rate=learning_rate,max_depth=max_depth,subsample=subsample,min_samples_split=min_samples_split,min_samples_leaf=min_samples_leaf,max_features=max_features)
+            case "principal-component-analysis":
+                result = principal_component_analysis_algo(f,target_column,n_components=n_components,cleaned_data=not enable_data_cleaning,scale_data=scale_data,random_state=random_state)
             case _:  # default case
                 raise ValueError(f"Unknown model: {model}")
     

@@ -11,6 +11,7 @@ from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, Gradien
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.svm import SVC
+from sklearn.decomposition import PCA
 from sklearn.linear_model import Lasso
 import os
 import joblib
@@ -1533,6 +1534,165 @@ def gradient_boosting_classifier_algo(
             "max_features": _max_features,
 
             "testSize": float(test_size)
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
+
+def principal_component_analysis_algo(
+    file,
+    target_column=None,          # optional (for visualization only)
+    n_components=None,           # int or float (e.g. 0.95)
+    cleaned_data=True,
+    scale_data=True,
+    random_state=101
+):
+    try:
+        # ===============================
+        # 🔹 READ FILE
+        # ===============================
+        if file.name.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(file)
+        else:
+            file.seek(0)
+            df = pd.read_csv(io.BytesIO(file.read()))
+
+        if df.empty:
+            return {"error": "Uploaded file is empty."}
+
+        # ===============================
+        # 🔹 DATA CLEANING
+        # ===============================
+        if not cleaned_data:
+            df, _ = clean_data(df=df)
+
+        # ===============================
+        # 🔹 TARGET COLUMN (OPTIONAL)
+        # ===============================
+        if target_column and target_column in df.columns:
+            y = df[target_column]
+            X = df.drop(columns=[target_column])
+        else:
+            y = None
+            X = df.copy()
+
+        # ===============================
+        # 🔹 ENCODING
+        # ===============================
+        X = pd.get_dummies(X, drop_first=True)
+        X = X.select_dtypes(include="number")
+
+        if X.empty:
+            return {"error": "No numeric features available for PCA."}
+
+        # ===============================
+        # 🔹 SCALING
+        # ===============================
+        scaler = None
+        if scale_data:
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+        else:
+            X_scaled = X.values
+
+        # ===============================
+        # 🔹 PCA MODEL
+        # ===============================
+        pca = PCA(n_components=n_components, random_state=random_state)
+        X_pca = pca.fit_transform(X_scaled)
+
+        # ===============================
+        # 🔹 SAVE MODEL
+        # ===============================
+        model_id = f"pca_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        model_filename = f"{model_id}.pkl"
+        model_path = os.path.join("trained_models", model_filename)
+
+        os.makedirs("trained_models", exist_ok=True)
+
+        model_data = {
+            "model": pca,
+            "scaler": scaler,
+            "feature_names": X.columns.tolist(),
+            "target_column": target_column,
+            "model_id": model_id,
+            "config": {
+                "n_components": n_components,
+                "scale_data": scale_data
+            }
+        }
+
+        joblib.dump(model_data, model_path)
+
+        # ===============================
+        # 🔹 PCA METRICS
+        # ===============================
+        explained_variance = pca.explained_variance_ratio_
+        cumulative_variance = explained_variance.cumsum()
+
+        # Component loadings
+        loadings = pd.DataFrame(
+            pca.components_,
+            columns=X.columns,
+            index=[f"PC{i+1}" for i in range(pca.n_components_)]
+        )
+
+        # Top features per component
+        top_features = {
+            pc: dict(
+                loadings.loc[pc]
+                .abs()
+                .sort_values(ascending=False)
+                .head(5)
+            )
+            for pc in loadings.index
+        }
+
+        # ===============================
+        # 🔹 PCA TRANSFORMED DATA
+        # ===============================
+        transformed_data = [
+            {
+                "index": int(i + 1),
+                "components": [float(val) for val in row],
+                "target": str(y.iloc[i]) if y is not None else None
+            }
+            for i, row in enumerate(X_pca)
+        ]
+
+        # ===============================
+        # 🔹 RESPONSE
+        # ===============================
+        return {
+            "model_id": model_id,
+
+            "n_samples": int(X.shape[0]),
+            "original_features": int(X.shape[1]),
+            "n_components": int(pca.n_components_),
+
+            "explained_variance_ratio": [float(v) for v in explained_variance],
+            "cumulative_variance": [float(v) for v in cumulative_variance],
+
+            "components": {
+                f"PC{i+1}": [float(val) for val in comp]
+                for i, comp in enumerate(pca.components_)
+            },
+
+            "feature_loadings": {
+                pc: {str(k): float(v) for k, v in loadings.loc[pc].items()}
+                for pc in loadings.index
+            },
+
+            "top_features_per_component": {
+                pc: {str(k): float(v) for k, v in feats.items()}
+                for pc, feats in top_features.items()
+            },
+
+            "transformed_data": transformed_data,
+
+            "scale_data": scale_data,
+            "target_column": target_column,
+            "feature_names": X.columns.tolist()
         }
 
     except Exception as e:

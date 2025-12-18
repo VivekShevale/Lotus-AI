@@ -31,6 +31,8 @@ import AdaBoostResult from "../components/AdaBoostClassifier/AdaBoostResult";
 import AdaBoostForm from "../components/AdaBoostClassifier/AdaBoostForm";
 import GradientBoostingResult from "../components/GradientBoostingClassifier/GradientBoostingResult";
 import GradientBoostingForm from "../components/GradientBoostingClassifier/GradientBoostingForm";
+import PrincipalComponentAnalysisForm from "../components/PrincipalComponentAnalysis/PrincipalComponentAnalysisForm";
+import PrincipalComponentAnalysisResult from "../components/PrincipalComponentAnalysis/PrincipalComponentAnalysisResult";
 
 export default function ModelTraining() {
   const { slug } = useParams();
@@ -100,7 +102,12 @@ export default function ModelTraining() {
   // Gradient Boosting
   const [subsample, setSubsample] = useState(1.0);
   const [maxFeatures, setMaxFeatures] = useState(1.0);
-    
+
+  // Principal Component Analysis (PCA) specific states
+  const [scaleData, setScaleData] = useState(true); // Default: true (recommended for PCA)
+  const [nComponents, setNComponents] = useState("0.95"); // Default: 95% variance
+  const [componentType, setComponentType] = useState("variance"); // "manual" or "variance"
+
   //import title
   const model = models.find((m) => m.slug === slug);
   if (!model) {
@@ -172,7 +179,8 @@ export default function ModelTraining() {
       model.slug === "lasso-regression" ||
       model.slug === "elastic-net" ||
       model.slug === "adaboost" ||
-      model.slug === "gradient-boosting"
+      model.slug === "gradient-boosting" ||
+      model.slug === "principal-component-analysis"
     ) {
       formData.append("file", file);
       formData.append("target_column", targetColumn);
@@ -280,6 +288,19 @@ export default function ModelTraining() {
       formData.append("min_samples_split", minSamplesSplit || 2);
       formData.append("min_samples_leaf", minSamplesLeaf || 1);
       formData.append("max_features", maxFeatures || 1.0);
+    }
+    if (model.slug === "principal-component-analysis") {
+      // PCA specific parameters
+      if (componentType === "manual") {
+        // Send integer for manual component selection
+        formData.append("n_components", parseInt(nComponents) || "");
+      } else {
+        // Send float for variance threshold selection
+        formData.append("n_components", parseFloat(nComponents) || 0.95);
+      }
+      formData.append("scale_data", scaleData);
+      formData.append("cleaned_data", enableDataCleaning);
+      formData.append("random_state", 101); // Default from algorithm
     }
     try {
       const res = await api.post("/api/perform", formData, {
@@ -837,6 +858,35 @@ export default function ModelTraining() {
                     setMaxFeatures={setMaxFeatures}
                   />
                 )}
+                {model.slug === "principal-component-analysis" && (
+                  <PrincipalComponentAnalysisForm
+                    onFileChange={setFile}
+                    onTargetChange={handleTargetChange}
+                    targetColumn={targetColumn}
+                    columns={columns}
+                    setResult={setResult}
+                    setError={setError}
+                    testSize={testSize}
+                    setTestSize={setTestSize}
+                    randomState={randomState}
+                    setRandomState={setRandomState}
+                    loading={loading}
+                    downloadLoading={downloadLoading}
+                    isTrained={isTrained}
+                    file={file}
+                    onTrain={handleSubmit}
+                    onDownload={handleDownloadModel}
+                    enableDataCleaning={enableDataCleaning}
+                    setEnableDataCleaning={setEnableDataCleaning}
+                    // PCA specific props
+                    scaleData={scaleData}
+                    setScaleData={setScaleData}
+                    nComponents={nComponents}
+                    setNComponents={setNComponents}
+                    componentType={componentType}
+                    setComponentType={setComponentType}
+                  />
+                )}
               </div>
 
               {/* Prediction Results - Full width below the form */}
@@ -919,6 +969,13 @@ export default function ModelTraining() {
                 )}
                 {model.slug == "gradient-boosting" && (
                   <GradientBoostingResult
+                    result={result}
+                    error={error}
+                    targetColumn={targetColumn}
+                  />
+                )}
+                {model.slug == "principal-component-analysis" && (
+                  <PrincipalComponentAnalysisResult
                     result={result}
                     error={error}
                     targetColumn={targetColumn}
