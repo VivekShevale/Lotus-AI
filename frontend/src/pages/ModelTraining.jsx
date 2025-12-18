@@ -29,6 +29,8 @@ import ElasticNetForm from "../components/ElasticNetRegression/ElasticNetForm";
 import ElasticNetResult from "../components/ElasticNetRegression/ElasticNetResult";
 import AdaBoostResult from "../components/AdaBoostClassifier/AdaBoostResult";
 import AdaBoostForm from "../components/AdaBoostClassifier/AdaBoostForm";
+import GradientBoostingResult from "../components/GradientBoostingClassifier/GradientBoostingResult";
+import GradientBoostingForm from "../components/GradientBoostingClassifier/GradientBoostingForm";
 
 export default function ModelTraining() {
   const { slug } = useParams();
@@ -95,8 +97,10 @@ export default function ModelTraining() {
   // ElasticNet specific states
   const [l1Ratio, setL1Ratio] = useState(0.5); // L1/L2 balance (0-1)
 
-  // AdaBoost
- 
+  // Gradient Boosting
+  const [subsample, setSubsample] = useState(1.0);
+  const [maxFeatures, setMaxFeatures] = useState(1.0);
+    
   //import title
   const model = models.find((m) => m.slug === slug);
   if (!model) {
@@ -167,7 +171,8 @@ export default function ModelTraining() {
       model.slug === "support-vector-machine" ||
       model.slug === "lasso-regression" ||
       model.slug === "elastic-net" ||
-      model.slug === "adaboost"
+      model.slug === "adaboost" ||
+      model.slug === "gradient-boosting"
     ) {
       formData.append("file", file);
       formData.append("target_column", targetColumn);
@@ -265,6 +270,16 @@ export default function ModelTraining() {
       formData.append("n_estimators", nEstimators || 50);
       formData.append("learning_rate", learningRate || 1.0);
       formData.append("algorithm", algorithm || "SAMME");
+    }
+    if (model.slug === "gradient-boosting") {
+      // Gradient Boosting specific parameters
+      formData.append("n_estimators", nEstimators || 100);
+      formData.append("learning_rate", learningRate || 0.1);
+      formData.append("max_depth", maxDepth || 3);
+      formData.append("subsample", subsample || 1.0);
+      formData.append("min_samples_split", minSamplesSplit || 2);
+      formData.append("min_samples_leaf", minSamplesLeaf || 1);
+      formData.append("max_features", maxFeatures || 1.0);
     }
     try {
       const res = await api.post("/api/perform", formData, {
@@ -785,6 +800,43 @@ export default function ModelTraining() {
                     setAlgorithm={setAlgorithm}
                   />
                 )}
+                {model.slug === "gradient-boosting" && (
+                  <GradientBoostingForm
+                    onFileChange={setFile}
+                    onTargetChange={handleTargetChange}
+                    targetColumn={targetColumn}
+                    columns={columns}
+                    setResult={setResult}
+                    setError={setError}
+                    testSize={testSize}
+                    setTestSize={setTestSize}
+                    randomState={randomState}
+                    setRandomState={setRandomState}
+                    loading={loading}
+                    downloadLoading={downloadLoading}
+                    isTrained={isTrained}
+                    file={file}
+                    onTrain={handleSubmit}
+                    onDownload={handleDownloadModel}
+                    enableDataCleaning={enableDataCleaning}
+                    setEnableDataCleaning={setEnableDataCleaning}
+                    // Gradient Boosting specific props (only what the form uses)
+                    nEstimators={nEstimators}
+                    setNEstimators={setNEstimators}
+                    learningRate={learningRate}
+                    setLearningRate={setLearningRate}
+                    maxDepth={maxDepth}
+                    setMaxDepth={setMaxDepth}
+                    subsample={subsample}
+                    setSubsample={setSubsample}
+                    minSamplesSplit={minSamplesSplit}
+                    setMinSamplesSplit={setMinSamplesSplit}
+                    minSamplesLeaf={minSamplesLeaf}
+                    setMinSamplesLeaf={setMinSamplesLeaf}
+                    maxFeatures={maxFeatures}
+                    setMaxFeatures={setMaxFeatures}
+                  />
+                )}
               </div>
 
               {/* Prediction Results - Full width below the form */}
@@ -860,6 +912,13 @@ export default function ModelTraining() {
                 )}
                 {model.slug == "adaboost" && (
                   <AdaBoostResult
+                    result={result}
+                    error={error}
+                    targetColumn={targetColumn}
+                  />
+                )}
+                {model.slug == "gradient-boosting" && (
+                  <GradientBoostingResult
                     result={result}
                     error={error}
                     targetColumn={targetColumn}

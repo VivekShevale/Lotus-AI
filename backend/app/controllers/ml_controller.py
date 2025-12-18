@@ -1,5 +1,5 @@
 from flask import request, jsonify
-from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo, ridge_regression_algo, svm_classifier_algo, lasso_regression_algo, elastic_net_regression_algo, adaboost_classifier_algo
+from app.services.ml_service import linear_regression_algo, logistic_regression_algo,  decision_tree_classifier_algo, knn_classifier_algo, random_forest_classifier_algo, ridge_regression_algo, svm_classifier_algo, lasso_regression_algo, elastic_net_regression_algo, adaboost_classifier_algo, gradient_boosting_classifier_algo
 from app.services.neural_services import neural_network_regression_algo    
 from app.services.image_classifier import train_image_classifier
 
@@ -236,7 +236,65 @@ def model_training():
             algorithm = request.form.get("algorithm")
             if algorithm in [None, "", "null"]:
                 algorithm = "SAMME"      # default
-            # allowed: "SAMME"
+                    # allowed: "SAMME"
+                    
+                    
+        elif model == "gradient-boosting":
+            # n_estimators (int)
+            n_estimators = request.form.get("n_estimators")
+            if n_estimators in [None, "", "null"]:
+                n_estimators = 100        # default value
+            else:
+                n_estimators = int(n_estimators)
+
+            # learning_rate (float)
+            learning_rate = request.form.get("learning_rate")
+            if learning_rate in [None, "", "null"]:
+                learning_rate = 0.1       # default value
+            else:
+                learning_rate = float(learning_rate)
+
+            # max_depth (int)
+            max_depth = request.form.get("max_depth")
+            if max_depth in [None, "", "null"]:
+                max_depth = 3             # default value
+            else:
+                max_depth = int(max_depth)
+
+            # subsample (float)
+            subsample = request.form.get("subsample")
+            if subsample in [None, "", "null"]:
+                subsample = 1.0           # default value
+            else:
+                subsample = float(subsample)
+            
+            # min_samples_split (int)
+            min_samples_split = request.form.get("min_samples_split")
+            if min_samples_split in [None, "", "null"]:
+                min_samples_split = 2
+            else:
+                min_samples_split = int(min_samples_split)
+
+            # min_samples_leaf (int)
+            min_samples_leaf = request.form.get("min_samples_leaf")
+            if min_samples_leaf in [None, "", "null"]:
+                min_samples_leaf = 1
+            else:
+                min_samples_leaf = int(min_samples_leaf)
+
+            # max_features (string / float / None)
+            max_features = request.form.get("max_features")
+            if max_features in [None, "", "null"]:
+                max_features = None
+            elif max_features in ["sqrt", "log2"]:
+                pass  # keep as string
+            else:
+                # numeric value (float or int)
+                if "." in str(max_features):
+                    max_features = float(max_features)
+                else:
+                    max_features = int(max_features)
+
 
 
         
@@ -273,6 +331,8 @@ def model_training():
                 result = elastic_net_regression_algo(f,target_column,test_size,random_state,cleaned_data=not enable_data_cleaning,alpha=alpha,l1_ratio=l1_ratio,max_iter=max_iter)
             case "adaboost":
                 result = adaboost_classifier_algo(f,target_column,test_size,random_state,cleaned_data=not enable_data_cleaning,n_estimators=n_estimators,learning_rate=learning_rate,algorithm=algorithm)
+            case "gradient-boosting":
+                result = gradient_boosting_classifier_algo(f,target_column,test_size,random_state,cleaned_data=not enable_data_cleaning,n_estimators=n_estimators,learning_rate=learning_rate,max_depth=max_depth,subsample=subsample,min_samples_split=min_samples_split,min_samples_leaf=min_samples_leaf,max_features=max_features)
             case _:  # default case
                 raise ValueError(f"Unknown model: {model}")
     
