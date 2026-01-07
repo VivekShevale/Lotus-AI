@@ -33,13 +33,13 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
   const sidebarRef = useRef(null);
 
   // Main navigation items
-  const mainMenuItems = [{ name: "Dashboard", href: "/", icon: HomeIcon }];
+  const mainMenuItems = [{ name: "Dashboard", href: "/home", icon: HomeIcon }];
 
   // Models section items
   // In your Sidebar component, update the modelsItems to include the main models page:
   const modelsItems = [
     { name: "All Models", href: "/models/all", icon: BotIcon },
-    { name: "Create New", href: "/models/create", icon: PlusIcon },
+    { name: "Create New Flow", href: "/models/create-flow", icon: PlusIcon },
     { name: "Model Library", href: "/models/library", icon: LibraryIcon },
   ];
 

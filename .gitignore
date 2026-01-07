@@ -82,3 +82,6 @@ __pycache__/
 
 # Backend trained models
 trained_models/
+
+.env
+.env.*

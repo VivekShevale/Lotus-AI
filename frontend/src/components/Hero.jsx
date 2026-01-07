@@ -1,169 +1,102 @@
-import { ArrowRight, Sparkles, BarChart3, Zap, TrendingUp, Target } from 'lucide-react';
+import React from 'react';
 
-export default function HeroSection() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/20 dark:from-gray-900 dark:via-blue-900/10 dark:to-purple-900/10 transition-colors duration-300">
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
-        {/* Enhanced Background Elements */}
-        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-200/30 dark:bg-blue-500/10 rounded-full blur-3xl animate-float"></div>
-        <div className="absolute top-40 right-10 w-96 h-96 bg-purple-200/30 dark:bg-purple-500/10 rounded-full blur-3xl animate-float delay-1000"></div>
-        <div className="absolute bottom-20 left-1/3 w-80 h-80 bg-green-200/30 dark:bg-green-500/10 rounded-full blur-3xl animate-float delay-500"></div>
-        
-        {/* Grid Pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(99,102,241,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.03)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,black,transparent)]"></div>
+const Hero = () => {
+    const [mobileOpen, setMobileOpen] = React.useState(false)
 
-        {/* Main Content */}
-        <div className="relative z-10 text-center">
-          {/* Enhanced Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/60 dark:border-gray-700/60 text-gray-700 dark:text-gray-300 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105 mb-8 group cursor-pointer">
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
-                <div className="absolute inset-0 bg-blue-600/20 dark:bg-blue-400/20 rounded-full animate-ping"></div>
-              </div>
-              <span className="text-sm font-medium bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
-                Advanced ML Analysis Platform
-              </span>
-            </div>
-          </div>
+    return (
+        <>
+            <style>
+                {`
+                    @import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
 
-          {/* Enhanced Main Heading */}
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight mb-8">
-            <span className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 dark:from-gray-100 dark:via-gray-200 dark:to-gray-100 bg-clip-text text-transparent">
-              Predict with
-            </span>
-            <br />
-            <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 bg-clip-text text-transparent animate-gradient-x">
-              Precision & Power
-            </span>
-          </h1>
+                    *{
+                        font-family: "Poppins", sans-serif;
+                    }`
+                }
+            </style>
+            <section className='flex flex-col items-center bg-linear-to-b from-[#D9D9FF] to-[#F8F3F9] px-4 py-4' >
+                <nav className="flex items-center justify-between gap-8 bg-white/60 border border-white rounded-full px-4 md:px-2 py-2.5 w-full max-w-3xl" >
+                    <a href="https://prebuiltui.com" className='flex items-center md:pl-3'>
+                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="m12.75 8.3 6.75 3.884L26.25 8.3m-13.5 23.28v-7.755L6 19.94m27 0-6.75 3.885v7.754M6.405 12.408 19.5 19.954l13.095-7.546M19.5 35V19.94M33 25.914V13.962a2.98 2.98 0 0 0-1.5-2.585L21 5.4a3.01 3.01 0 0 0-3 0L7.5 11.377A3 3 0 0 0 6 13.962v11.953A2.98 2.98 0 0 0 7.5 28.5L18 34.477a3.01 3.01 0 0 0 3 0L31.5 28.5a3 3 0 0 0 1.5-2.585" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </a>
+                    <div className='w-0.5 h-8 bg-gray-50 hidden md:flex'></div>
+                    <div id="menu" className={`max-md:absolute max-md:bg-white/70 max-md:h-[785px] max-md:overflow-hidden max-md:transition-[width] max-md:duration-300 max-md:top-0 max-md:left-0 max-md:flex-col max-md:justify-center max-md:backdrop-blur flex items-center gap-8 z-50 md:gap-10 flex-1 ${mobileOpen ? 'max-md:w-full' : 'max-md:w-0'}`}>
+                        <a href="#" onClick={() => setMobileOpen(false)} className="text-gray-600 hover:text-gray-700 text-sm">Services</a>
+                        <a href="#" onClick={() => setMobileOpen(false)} className="text-gray-600 hover:text-gray-700 text-sm">Reviews</a>
+                        <a href="#" onClick={() => setMobileOpen(false)} className="text-gray-600 hover:text-gray-700 text-sm">Pricing</a>
+                        <a href="#" onClick={() => setMobileOpen(false)} className="text-gray-600 hover:text-gray-700 text-sm">Projects</a>
+                        <a href="#" onClick={() => setMobileOpen(false)} className="text-gray-600 hover:text-gray-700 text-sm">Contact Us</a>
 
-          {/* Enhanced Subheading */}
-          <p className="text-lg sm:text-xl lg:text-2xl text-gray-600 dark:text-gray-300 max-w-4xl mx-auto mb-12 leading-relaxed font-light">
-            Harness the power of <span className="font-semibold text-blue-600 dark:text-blue-400">Linear Regression</span> and{' '}
-            <span className="font-semibold text-purple-600 dark:text-purple-400">Logistic Classification</span> with automated preprocessing, 
-            real-time visualizations, and enterprise-grade performance metrics.
-          </p>
+                        <button id="close-menu" onClick={() => setMobileOpen(false)} className="md:hidden bg-violet-500 active:bg-violet-600 text-white p-2 rounded-md aspect-square font-medium transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 6 6 18" />
+                                <path d="m6 6 12 12" />
+                            </svg>
+                        </button>
+                    </div>
 
-          {/* Enhanced CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
-            <button className="group relative inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 dark:from-blue-500 dark:to-purple-500 dark:hover:from-blue-400 dark:hover:to-purple-400 text-white font-semibold rounded-2xl shadow-lg hover:shadow-blue-500/25 dark:hover:shadow-blue-400/25 transition-all duration-300 hover:scale-105 active:scale-95 overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-              <TrendingUp className="w-5 h-5 relative z-10" />
-              <span className="relative z-10">Start Regression Analysis</span>
-              <ArrowRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
-            </button>
-            
-            <button className="group inline-flex items-center gap-3 px-8 py-4 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/60 dark:border-gray-700/60 text-gray-700 dark:text-gray-200 font-semibold rounded-2xl shadow-lg hover:shadow-xl hover:border-blue-200 dark:hover:border-blue-500/30 transition-all duration-300 hover:scale-105 active:scale-95">
-              <Target className="w-5 h-5" />
-              <span>Try Classification</span>
-            </button>
-          </div>
+                    <div className="flex items-center gap-2 md:pr-1">
+                        <button className="hidden md:inline-block bg-violet-600 hover:bg-violet-700 text-white px-4 md:px-6 py-2 md:py-3 rounded-full text-xs md:text-sm transition cursor-pointer">
+                            Get Template
+                        </button>
 
-          {/* Enhanced Features Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-            {[
-              {
-                icon: Zap,
-                title: "Lightning Fast",
-                description: "Get results in seconds with optimized algorithms",
-                color: "blue",
-                gradient: "from-blue-500 to-cyan-500"
-              },
-              {
-                icon: BarChart3,
-                title: "Smart Preprocessing",
-                description: "Auto-handling of missing values & feature encoding",
-                color: "purple",
-                gradient: "from-purple-500 to-pink-500"
-              },
-              {
-                icon: TrendingUp,
-                title: "Real-time Charts",
-                description: "Interactive visualizations & performance metrics",
-                color: "green",
-                gradient: "from-green-500 to-emerald-500"
-              },
-              {
-                icon: Sparkles,
-                title: "Model Insights",
-                description: "Feature importance & prediction explanations",
-                color: "orange",
-                gradient: "from-orange-500 to-red-500"
-              }
-            ].map((feature, index) => (
-              <div 
-                key={feature.title}
-                className="group bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm p-6 rounded-2xl border border-gray-200/50 dark:border-gray-700/50 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                <div className={`inline-flex items-center justify-center w-12 h-12 bg-gradient-to-r ${feature.gradient} rounded-xl mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
-                  <feature.icon className="w-6 h-6 text-white" />
+                        <button id="open-menu" onClick={() => setMobileOpen(true)} className="md:hidden text-gray-700 p-2 rounded-md aspect-square font-medium transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 12h16" />
+                                <path d="M4 18h16" />
+                                <path d="M4 6h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </nav>
+
+                <div className="flex flex-wrap items-center justify-center gap-2 pl-2 pr-4 py-1.5 mt-30 rounded-full bg-white/50 border border-white">
+                    <div className="relative flex size-3.5 items-center justify-center">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping duration-300"></span>
+                        <span className="relative inline-flex size-2 rounded-full bg-green-600"></span>
+                    </div>
+                    <p className="text-sm text-black/60">Join 12,450+ brands growing with us</p>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-gray-700 dark:group-hover:text-gray-200 transition-colors">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
-                  {feature.description}
+
+                <h1 className='text-4xl md:text-[66px]/19 text-center max-w-2xl mt-8 text-gray-800 bg-clip-text leading-tight font-medium'>Websites built to perform beautifully.</h1>
+                <p className="text-sm text-gray-600 text-center max-w-[630px] mt-4">
+                    We design high-impact websites that convert and scale. From sleek interfaces to full stack experiences, we bring your brand to life online.
                 </p>
-              </div>
-            ))}
-          </div>
 
-          {/* Stats Section */}
-          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-2xl mx-auto">
-            {[
-              { value: "99.9%", label: "Accuracy" },
-              { value: "2s", label: "Processing Time" },
-              { value: "50+", label: "Features" },
-              { value: "24/7", label: "Availability" }
-            ].map((stat, index) => (
-              <div key={stat.label} className="text-center">
-                <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                  {stat.value}
+                <div className='flex gap-3 mt-10'>
+                    <button className="bg-violet-600 hover:bg-violet-700 text-white text-xs md:text-sm px-6 py-3 rounded-lg transition cursor-pointer">
+                        Get Started Now
+                    </button>
+                    <button className="bg-white hover:bg-white/5 border border-violet-400 text-gray-600 text-xs md:text-sm px-5 py-3 rounded-lg transition cursor-pointer">
+                        Book a demo
+                    </button>
                 </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                  {stat.label}
-                </div>
-              </div>
-            ))}
-          </div>
 
-          {/* Enhanced Trust Badge */}
-          <div className="mt-16 flex flex-col items-center">
-            <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 font-medium">TRUSTED BY DATA TEAMS AT</p>
-            <div className="flex flex-wrap justify-center gap-8 opacity-70 hover:opacity-100 transition-opacity duration-300">
-              {['TechCorp', 'DataFlow', 'Analytica', 'InsightLabs', 'StatWise', 'MLPro'].map((company) => (
-                <div 
-                  key={company} 
-                  className="text-gray-600 dark:text-gray-300 font-semibold text-lg hover:text-gray-900 dark:hover:text-white transition-colors duration-300 cursor-pointer"
-                >
-                  {company}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+                <div className='w-full max-w-[800px] h-[3px] mt-10 bg-linear-to-r from-white/10 via-violet-600 to-white/10'></div>
 
-      {/* Custom Animations */}
-      <style jsx>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-20px) rotate(180deg); }
-        }
-        @keyframes gradient-x {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
-        }
-        .animate-gradient-x {
-          background-size: 200% 200%;
-          animation: gradient-x 3s ease infinite;
-        }
-      `}</style>
-    </div>
-  );
+                <div className='grid grid-cols-2 md:grid-cols-4 gap-8 py-18 max-w-[930px] w-full'>
+                    <div className='text-center'>
+                        <h2 className='font-medium text-2xl md:text-3xl text-gray-800'>20+</h2>
+                        <p className='text-xs md:text-sm text-gray-500'>Years Experience</p>
+                    </div>
+                    <div className='text-center'>
+                        <h2 className='font-medium text-2xl md:text-3xl text-gray-800'>12k+</h2>
+                        <p className='text-xs md:text-sm text-gray-500'>Projects Completed</p>
+                    </div>
+                    <div className='text-center'>
+                        <h2 className='font-medium text-2xl md:text-3xl text-gray-800'>5k+</h2>
+                        <p className='text-xs md:text-sm text-gray-500'>Happy Customers</p>
+                    </div>
+                    <div className='text-center'>
+                        <h2 className='font-medium text-2xl md:text-3xl text-gray-800'>5+</h2>
+                        <p className='text-xs md:text-sm text-gray-500'>Countries</p>
+                    </div>
+                </div>
+            </section>
+        </>
+    )
 }
+
+export default Hero;
