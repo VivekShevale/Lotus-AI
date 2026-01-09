@@ -7,7 +7,11 @@ from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from math import sqrt
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier
+from sklearn.ensemble import (
+    RandomForestClassifier,
+    AdaBoostClassifier,
+    GradientBoostingClassifier,
+)
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.svm import SVC
@@ -18,20 +22,45 @@ import joblib
 from datetime import datetime
 from .clean_data import clean_data
 from sklearn.metrics import confusion_matrix, classification_report
+from app.models.ml_model import MLModel
+from app.database.sql_db import db
 
-def linear_regression_algo(file, target_column=None, test_size=0.3, random_state=101, cleaned_data=True):
+from app.utils.r2_storage import R2Storage
+
+def linear_regression_algo(
+    file, target_column=None, test_size=0.3, random_state=101, cleaned_data=True, user_id=None
+):
+    """
+    Train a Linear Regression model and save it to R2 with metadata in database
+    
+    Args:
+        file: Uploaded CSV/Excel file
+        target_column: Column to predict (uses last column if None)
+        test_size: Proportion of dataset for testing (default 0.3)
+        random_state: Random seed for reproducibility (default 101)
+        cleaned_data: If True, skip data cleaning (default True)
+        user_id: ID of user creating the model (optional)
+    
+    Returns:
+        dict: Training results with model_id, metrics, and storage info
+    """
     try:
-        # Read CSV or Excel
-        if file.name.endswith(('.xls', '.xlsx')):
-            df = pd.read_excel(file)
+        # Read CSV or Excel with proper engine
+        filename = file.name.lower()
+        
+        if filename.endswith('.xlsx'):
+            df = pd.read_excel(file, engine='openpyxl')
+        elif filename.endswith('.xls'):
+            df = pd.read_excel(file, engine='xlrd')
         else:
+            # Read as CSV
             file.seek(0)
             df = pd.read_csv(io.BytesIO(file.read()))
 
         if df.empty:
             return {"error": "Uploaded file is empty."}
-        
-        # FIX: Apply data cleaning if NOT cleaned_data (parameter name is confusing)
+
+        # Apply data cleaning if NOT cleaned_data
         if not cleaned_data:
             df, _ = clean_data(df=df)
 
@@ -42,10 +71,11 @@ def linear_regression_algo(file, target_column=None, test_size=0.3, random_state
         if target_column not in df.columns:
             return {"error": f"Target column '{target_column}' not found."}
 
+        # Separate features and target
         X = df.drop(columns=[target_column])
         y = df[target_column]
 
-        # encoding categorical columns
+        # Encode categorical columns using one-hot encoding
         X = pd.get_dummies(X, drop_first=True)
 
         # Keep only numeric features
@@ -59,54 +89,98 @@ def linear_regression_algo(file, target_column=None, test_size=0.3, random_state
             X, y, test_size=test_size, random_state=random_state
         )
 
+        # Train Linear Regression model
         model = LinearRegression()
         model.fit(X_train, y_train)
+        
+        # Make predictions
         preds = model.predict(X_test)
 
-        # Save the trained model
+        # Calculate metrics
+        y_test = y_test.reset_index(drop=True)
+        r2 = round(float(r2_score(y_test, preds)), 4)
+        mae = round(float(mean_absolute_error(y_test, preds)), 4)
+        rmse = round(float(sqrt(mean_squared_error(y_test, preds))), 4)
+
+        # Generate unique model ID
         model_id = f"linear_regression_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        model_filename = f"{model_id}.pkl"
-        model_path = os.path.join('trained_models', model_filename)
         
-        os.makedirs('trained_models', exist_ok=True)
-        
-        model_data = {
-            'model': model,
-            'feature_names': X.columns.tolist(),
+        # Prepare metadata for database storage
+        model_metadata = {
+            'model_id': model_id,
+            'model_type': 'linear_regression',
             'target_column': target_column,
-            'model_id': model_id
+            'feature_names': X.columns.tolist(),
+            'n_samples': len(df),
+            'test_size': test_size,
+            'hyperparameters': {
+                'random_state': random_state
+            },
+            'metrics': {
+                'r2': r2,
+                'mae': mae,
+                'rmse': rmse,
+            }
         }
 
-        joblib.dump(model_data, model_path)
-        y_test = y_test.reset_index(drop=True)
+        # Upload ONLY the sklearn model to R2 (async, non-blocking)
+        r2_storage = R2Storage()
+        r2_path = r2_storage.save_model_only(model, model_id, 'linear_regression')
+        
+        # Save metadata to database
+        ml_model = MLModel.create_from_training(model_metadata, r2_path, user_id)
+        db.session.add(ml_model)
+        db.session.commit()
 
-        # Ensure all metrics are standard Python types
+        # Calculate top 5 most important features by coefficient magnitude
+        top_features = dict(
+            sorted(
+                zip(X.columns.tolist(), [float(coef) for coef in model.coef_]),
+                key=lambda x: abs(x[1]),
+                reverse=True,
+            )[:5]
+        )
+
+        # Return complete training results
         return {
-            'r2': round(float(r2_score(y_test, preds)), 4),
-            'mae': round(float(mean_absolute_error(y_test, preds)), 4),
-            'rmse': round(float(sqrt(mean_squared_error(y_test, preds))), 4),
+            # Performance metrics
+            'r2': r2,
+            'mae': mae,
+            'rmse': rmse,
+            
+            # Dataset info
             'n_samples': len(df),
             'n_features': X.shape[1],
-            'top_features': dict(
-                sorted(
-                    zip(X.columns.tolist(), [float(coef) for coef in model.coef_]), 
-                    key=lambda x: abs(x[1]), 
-                    reverse=True
-                )[:5]
-            ),
+            
+            # Feature importance
+            'top_features': top_features,
+            
+            # Predictions vs actuals for visualization
             'predictions': [float(pred) for pred in preds],
             'actual': [float(actual) for actual in y_test],
+            
+            # Model identification
             'model_id': model_id,
+            'database_id': ml_model.id,
+            
+            # Storage info
+            'r2_path': r2_path,
+            'storage_status': 'uploading',  # Background upload in progress
+            
+            # Configuration
             'testSize': float(test_size),
         }
 
     except Exception as e:
         return {'error': str(e)}
+    
 
-def logistic_regression_algo(file, target_column=None, test_size=0.3, random_state=43, cleaned_data=True):
+def logistic_regression_algo(
+    file, target_column=None, test_size=0.3, random_state=43, cleaned_data=True
+):
     try:
         # Read CSV or Excel
-        if file.name.endswith(('.xls', '.xlsx')):
+        if file.name.endswith((".xls", ".xlsx")):
             df = pd.read_excel(file)
         else:
             df = pd.read_csv(io.BytesIO(file.read()))
@@ -117,7 +191,7 @@ def logistic_regression_algo(file, target_column=None, test_size=0.3, random_sta
         # FIX: Apply data cleaning if NOT cleaned_data
         if not cleaned_data:
             df, _ = clean_data(df=df)
-            
+
         # Use provided target_column or fallback to last column
         if not target_column:
             target_column = df.columns[-1]
@@ -143,59 +217,70 @@ def logistic_regression_algo(file, target_column=None, test_size=0.3, random_sta
         model.fit(X_train, y_train)
         preds = model.predict(X_test)
 
-        # Save the trained model
+        # Generate model ID
         model_id = f"logistic_regression_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        model_filename = f"{model_id}.pkl"
-        model_path = os.path.join('trained_models', model_filename)
-        
-        os.makedirs('trained_models', exist_ok=True)
-        
+
         model_data = {
-            'model': model,
-            'feature_names': X.columns.tolist(),
-            'target_column': target_column,
-            'model_id': model_id
+            "model": model,
+            "feature_names": X.columns.tolist(),
+            "target_column": target_column,
+            "model_id": model_id,
+            "metrics": {
+                "accuracy": round(float(accuracy_score(y_test, preds)), 4),
+            },
         }
-        joblib.dump(model_data, model_path)
+
+        # Upload directly to R2 in background - NO LOCAL STORAGE
+        r2_storage = R2Storage()
+        r2_path = r2_storage.save_model_direct_async(
+            model_data, model_id, "logistic_regression"
+        )
+
+        y_test = y_test.reset_index(drop=True)
 
         # Ensure all metrics are standard Python types
         return {
-            'accuracy': round(float(accuracy_score(y_test, preds)), 4),
-            'precision': round(float(precision_score(y_test, preds, average='weighted')), 4),
-            'recall': round(float(recall_score(y_test, preds, average='weighted')), 4),
-            'f1_score': round(float(f1_score(y_test, preds, average='weighted')), 4),
-            'n_samples': len(df),
-            'n_features': X.shape[1],
-            'top_features': dict(
+            "accuracy": round(float(accuracy_score(y_test, preds)), 4),
+            "precision": round(
+                float(precision_score(y_test, preds, average="weighted")), 4
+            ),
+            "recall": round(float(recall_score(y_test, preds, average="weighted")), 4),
+            "f1_score": round(float(f1_score(y_test, preds, average="weighted")), 4),
+            "n_samples": len(df),
+            "n_features": X.shape[1],
+            "top_features": dict(
                 sorted(
-                    zip(X.columns.tolist(), [float(coef) for coef in model.coef_[0]]), 
-                    key=lambda x: abs(x[1]), 
-                    reverse=True
+                    zip(X.columns.tolist(), [float(coef) for coef in model.coef_[0]]),
+                    key=lambda x: abs(x[1]),
+                    reverse=True,
                 )[:5]
             ),
-            'predictions': [int(pred) for pred in preds],
-            'actual': [int(actual) for actual in y_test],
-            'model_id': model_id,
-            'testSize': float(test_size),
+            "predictions": [int(pred) for pred in preds],
+            "actual": [int(actual) for actual in y_test],
+            "model_id": model_id,
+            "r2_path": r2_path,  # R2 storage path
+            "storage_status": "uploading",  # Background upload in progress
+            "testSize": float(test_size),
         }
 
     except Exception as e:
-        return {'error': str(e)}
-    
+        return {"error": str(e)}
+
+
 def decision_tree_classifier_algo(
-    file, 
-    target_column=None, 
-    test_size=0.3, 
-    random_state=101, 
+    file,
+    target_column=None,
+    test_size=0.3,
+    random_state=101,
     cleaned_data=True,
-    criterion="gini",          
-    max_depth=None,            
-    min_samples_split=2,       
-    min_samples_leaf=1         
+    criterion="gini",
+    max_depth=None,
+    min_samples_split=2,
+    min_samples_leaf=1,
 ):
     try:
         # Read CSV or Excel
-        if file.name.endswith(('.xls', '.xlsx')):
+        if file.name.endswith((".xls", ".xlsx")):
             df = pd.read_excel(file)
         else:
             file.seek(0)
@@ -246,34 +331,38 @@ def decision_tree_classifier_algo(
             max_depth=max_depth,
             min_samples_split=min_samples_split,
             min_samples_leaf=min_samples_leaf,
-            random_state=random_state
+            random_state=random_state,
         )
 
         model.fit(X_train, y_train)
         preds = model.predict(X_test)
-        
+
         # Get prediction probabilities
-        pred_proba = model.predict_proba(X_test) if hasattr(model, "predict_proba") else None
+        pred_proba = (
+            model.predict_proba(X_test) if hasattr(model, "predict_proba") else None
+        )
 
         # Save model
-        model_id = f"decision_tree_classifier_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        model_id = (
+            f"decision_tree_classifier_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        )
         model_filename = f"{model_id}.pkl"
         model_path = os.path.join("trained_models", model_filename)
 
         os.makedirs("trained_models", exist_ok=True)
 
         model_data = {
-            'model': model,
-            'feature_names': X.columns.tolist(),
-            'target_column': target_column,
-            'label_encoder': label_encoder,
-            'model_id': model_id,
-            'config': {
+            "model": model,
+            "feature_names": X.columns.tolist(),
+            "target_column": target_column,
+            "label_encoder": label_encoder,
+            "model_id": model_id,
+            "config": {
                 "criterion": criterion,
                 "max_depth": max_depth,
                 "min_samples_split": min_samples_split,
-                "min_samples_leaf": min_samples_leaf
-            }
+                "min_samples_leaf": min_samples_leaf,
+            },
         }
 
         joblib.dump(model_data, model_path)
@@ -291,10 +380,10 @@ def decision_tree_classifier_algo(
             sorted(
                 zip(X.columns.tolist(), [float(i) for i in importances]),
                 key=lambda x: x[1],
-                reverse=True
+                reverse=True,
             )
         )
-        
+
         # Top features (for summary)
         top_features = dict(list(feature_importance_dict.items())[:5])
 
@@ -312,7 +401,7 @@ def decision_tree_classifier_algo(
         cm = confusion_matrix(y_test, preds).tolist()
         class_report = classification_report(y_test, preds, output_dict=True)
         class_dist = dict(pd.Series(y).value_counts())
-        
+
         # Get test indices for reference
         test_indices = list(X_test.index)
 
@@ -321,89 +410,80 @@ def decision_tree_classifier_algo(
         if pred_proba is not None:
             for i, (pred, actual, proba) in enumerate(zip(preds, y_test, pred_proba)):
                 max_prob = float(max(proba))
-                prediction_data.append({
-                    'index': i + 1,
-                    'prediction': int(pred),
-                    'actual': int(actual),
-                    'confidence': max_prob,
-                    'is_correct': bool(pred == actual),
-                    'probabilities': [float(p) for p in proba]
-                })
+                prediction_data.append(
+                    {
+                        "index": i + 1,
+                        "prediction": int(pred),
+                        "actual": int(actual),
+                        "confidence": max_prob,
+                        "is_correct": bool(pred == actual),
+                        "probabilities": [float(p) for p in proba],
+                    }
+                )
         else:
             for i, (pred, actual) in enumerate(zip(preds, y_test)):
-                prediction_data.append({
-                    'index': i + 1,
-                    'prediction': int(pred),
-                    'actual': int(actual),
-                    'confidence': None,
-                    'is_correct': bool(pred == actual),
-                    'probabilities': None
-                })
+                prediction_data.append(
+                    {
+                        "index": i + 1,
+                        "prediction": int(pred),
+                        "actual": int(actual),
+                        "confidence": None,
+                        "is_correct": bool(pred == actual),
+                        "probabilities": None,
+                    }
+                )
 
         return {
             "accuracy": float(accuracy),
             "precision": float(precision),
             "recall": float(recall),
             "f1_score": float(f1),
-
             "tree_depth": int(tree_depth),
             "n_leaves": int(n_leaves),
             "n_nodes": int(n_nodes),
-
             "confusion_matrix": [[int(x) for x in row] for row in cm],
-
             "class_distribution": {str(k): int(v) for k, v in class_dist.items()},
-
             "class_report": {
                 str(label): {
-                    "precision": float(metrics.get('precision', 0)),
-                    "recall": float(metrics.get('recall', 0)),
-                    "f1-score": float(metrics.get('f1-score', 0)),
-                    "support": int(metrics.get('support', 0))
+                    "precision": float(metrics.get("precision", 0)),
+                    "recall": float(metrics.get("recall", 0)),
+                    "f1-score": float(metrics.get("f1-score", 0)),
+                    "support": int(metrics.get("support", 0)),
                 }
                 for label, metrics in class_report.items()
                 if isinstance(metrics, dict)  # only class rows
             },
-
             "classes": classes,
-
             "prediction_data": prediction_data,  # Add detailed prediction data
-            
             "prediction_proba": (
                 [[float(p) for p in row] for row in pred_proba]
-                if pred_proba is not None else None
+                if pred_proba is not None
+                else None
             ),
-
             "n_samples": int(len(df)),
             "n_features": int(X.shape[1]),
-
             "feature_importance": feature_importance_dict,  # All features with importance
             "top_features": {str(k): float(v) for k, v in top_features.items()},
-
             "predictions": [int(p) for p in preds],
             "actual": [int(a) for a in y_test],
-
             "model_id": str(model_id),
             "testSize": float(test_size),
-            
             # Additional metadata
             "criterion": criterion,
             "max_depth": max_depth,
             "min_samples_split": min_samples_split,
             "min_samples_leaf": min_samples_leaf,
-            
             # Training info
             "train_samples": int(len(X_train)),
             "test_samples": int(len(X_test)),
-            
             # Feature names
-            "feature_names": X.columns.tolist()
+            "feature_names": X.columns.tolist(),
         }
 
     except Exception as e:
         return {"error": str(e)}
-    
-    
+
+
 def knn_classifier_algo(
     file,
     target_column=None,
@@ -411,13 +491,13 @@ def knn_classifier_algo(
     random_state=101,
     cleaned_data=True,
     n_neighbors=5,
-    weights="uniform",        # "uniform" or "distance"
-    algorithm="auto",         # auto, ball_tree, kd_tree, brute
-    metric="minkowski"        # minkowski, euclidean, manhattan, etc.
+    weights="uniform",  # "uniform" or "distance"
+    algorithm="auto",  # auto, ball_tree, kd_tree, brute
+    metric="minkowski",  # minkowski, euclidean, manhattan, etc.
 ):
     try:
         # ----------- Load file (CSV or Excel) -----------
-        if file.name.endswith(('.xls', '.xlsx')):
+        if file.name.endswith((".xls", ".xlsx")):
             df = pd.read_excel(file)
         else:
             file.seek(0)
@@ -461,10 +541,7 @@ def knn_classifier_algo(
 
         # ----------- Build KNN Model -----------
         model = KNeighborsClassifier(
-            n_neighbors=n_neighbors,
-            weights=weights,
-            algorithm=algorithm,
-            metric=metric
+            n_neighbors=n_neighbors, weights=weights, algorithm=algorithm, metric=metric
         )
 
         model.fit(X_train, y_train)
@@ -490,23 +567,31 @@ def knn_classifier_algo(
                 "n_neighbors": n_neighbors,
                 "weights": weights,
                 "algorithm": algorithm,
-                "metric": metric
-            }
+                "metric": metric,
+            },
         }
 
         joblib.dump(model_data, model_path)
 
         # ----------- Metrics -----------
         accuracy = float(accuracy_score(y_test, preds))
-        precision = float(precision_score(y_test, preds, average="weighted", zero_division=0))
+        precision = float(
+            precision_score(y_test, preds, average="weighted", zero_division=0)
+        )
         recall = float(recall_score(y_test, preds, average="weighted", zero_division=0))
         f1 = float(f1_score(y_test, preds, average="weighted", zero_division=0))
 
         cm = confusion_matrix(y_test, preds).tolist()
         # Classification report → dict
         report = classification_report(y_test, preds, output_dict=True)
-        clean_report = {k: {m: float(v) for m, v in metrics.items()} if isinstance(metrics, dict) else float(metrics)
-                        for k, metrics in report.items()}
+        clean_report = {
+            k: (
+                {m: float(v) for m, v in metrics.items()}
+                if isinstance(metrics, dict)
+                else float(metrics)
+            )
+            for k, metrics in report.items()
+        }
 
         # Class distribution
         class_distribution = pd.Series(y).value_counts().to_dict()
@@ -525,17 +610,16 @@ def knn_classifier_algo(
             "predictions": [int(p) for p in preds],
             "prediction_proba": probs,
             "actual": [int(a) for a in y_test],
-            "k_value": int(n_neighbors),           
+            "k_value": int(n_neighbors),
             "classes": (
-                label_encoder.classes_.tolist() 
-                if label_encoder is not None 
+                label_encoder.classes_.tolist()
+                if label_encoder is not None
                 else sorted(list(set(y_test.tolist())))
             ),
             "algorithm": str(algorithm),
             "weights": str(weights),
             "metric": str(metric),
             "random_state": int(random_state),
-
             "model_id": model_id,
             "testSize": float(test_size),
         }
@@ -543,22 +627,23 @@ def knn_classifier_algo(
     except Exception as e:
         return {"error": str(e)}
 
+
 def random_forest_classifier_algo(
     file,
-    target_column=None, 
-    test_size=0.3, 
-    random_state=101, 
+    target_column=None,
+    test_size=0.3,
+    random_state=101,
     cleaned_data=True,
     n_estimators=200,
     criterion="gini",
     max_depth=None,
     min_samples_split=2,
     min_samples_leaf=1,
-    class_weight=None
+    class_weight=None,
 ):
     try:
         # Read CSV or Excel
-        if file.name.endswith(('.xls', '.xlsx')):
+        if file.name.endswith((".xls", ".xlsx")):
             df = pd.read_excel(file)
         else:
             file.seek(0)
@@ -600,10 +685,7 @@ def random_forest_classifier_algo(
 
         # Train-test split (stratified is better for classification)
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y,
-            test_size=test_size,
-            random_state=random_state,
-            stratify=y
+            X, y, test_size=test_size, random_state=random_state, stratify=y
         )
 
         # Build Random Forest model
@@ -614,7 +696,7 @@ def random_forest_classifier_algo(
             min_samples_split=min_samples_split,
             min_samples_leaf=min_samples_leaf,
             class_weight=class_weight,
-            random_state=random_state
+            random_state=random_state,
         )
 
         # Train
@@ -623,7 +705,9 @@ def random_forest_classifier_algo(
         pred_proba = model.predict_proba(X_test)
 
         # Save model
-        model_id = f"random_forest_classifier_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        model_id = (
+            f"random_forest_classifier_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        )
         model_filename = f"{model_id}.pkl"
         model_path = os.path.join("trained_models", model_filename)
 
@@ -641,8 +725,8 @@ def random_forest_classifier_algo(
                 "max_depth": max_depth,
                 "min_samples_split": min_samples_split,
                 "min_samples_leaf": min_samples_leaf,
-                "class_weight": class_weight
-            }
+                "class_weight": class_weight,
+            },
         }
 
         joblib.dump(model_data, model_path)
@@ -659,7 +743,7 @@ def random_forest_classifier_algo(
             sorted(
                 zip(X.columns.tolist(), [float(i) for i in importances]),
                 key=lambda x: x[1],
-                reverse=True
+                reverse=True,
             )
         )
         top_features = dict(list(feature_importance_dict.items())[:5])
@@ -678,63 +762,53 @@ def random_forest_classifier_algo(
         # Prediction-level details
         prediction_data = []
         for i, (pred, actual, proba) in enumerate(zip(preds, y_test, pred_proba)):
-            prediction_data.append({
-                "index": i + 1,
-                "prediction": int(pred),
-                "actual": int(actual),
-                "confidence": float(max(proba)),
-                "is_correct": bool(pred == actual),
-                "probabilities": [float(p) for p in proba]
-            })
+            prediction_data.append(
+                {
+                    "index": i + 1,
+                    "prediction": int(pred),
+                    "actual": int(actual),
+                    "confidence": float(max(proba)),
+                    "is_correct": bool(pred == actual),
+                    "probabilities": [float(p) for p in proba],
+                }
+            )
 
         return {
             "accuracy": float(accuracy),
             "precision": float(precision),
             "recall": float(recall),
             "f1_score": float(f1),
-
             # Random Forest internal metrics
             "n_estimators": n_estimators,
             "max_depth": max_depth,
             "min_samples_split": min_samples_split,
             "min_samples_leaf": min_samples_leaf,
-
             "confusion_matrix": cm,
             "class_distribution": {str(k): int(v) for k, v in class_dist.items()},
-
             "class_report": {
                 str(label): {
                     "precision": float(metrics.get("precision", 0)),
                     "recall": float(metrics.get("recall", 0)),
                     "f1-score": float(metrics.get("f1-score", 0)),
-                    "support": int(metrics.get("support", 0))
+                    "support": int(metrics.get("support", 0)),
                 }
                 for label, metrics in class_report.items()
                 if isinstance(metrics, dict)
             },
-
             "classes": classes,
             "prediction_data": prediction_data,
-
-            "prediction_proba": [
-                [float(p) for p in row] for row in pred_proba
-            ],
-
+            "prediction_proba": [[float(p) for p in row] for row in pred_proba],
             "n_samples": int(len(df)),
             "n_features": int(X.shape[1]),
-
             "feature_importance": feature_importance_dict,
             "top_features": {str(k): float(v) for k, v in top_features.items()},
-
             "predictions": [int(p) for p in preds],
             "actual": [int(a) for a in y_test],
-
             "model_id": str(model_id),
             "testSize": float(test_size),
-
             "train_samples": int(len(X_train)),
             "test_samples": int(len(X_test)),
-            "feature_names": X.columns.tolist()
+            "feature_names": X.columns.tolist(),
         }
 
     except Exception as e:
@@ -745,10 +819,18 @@ from math import sqrt
 from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
-def ridge_regression_algo(file, target_column=None, test_size=0.3, random_state=101, alpha=1.0, cleaned_data=True):
+
+def ridge_regression_algo(
+    file,
+    target_column=None,
+    test_size=0.3,
+    random_state=101,
+    alpha=1.0,
+    cleaned_data=True,
+):
     try:
         # Read CSV or Excel
-        if file.name.endswith(('.xls', '.xlsx')):
+        if file.name.endswith((".xls", ".xlsx")):
             df = pd.read_excel(file)
         else:
             file.seek(0)
@@ -756,7 +838,7 @@ def ridge_regression_algo(file, target_column=None, test_size=0.3, random_state=
 
         if df.empty:
             return {"error": "Uploaded file is empty."}
-        
+
         # Apply data cleaning if NOT already cleaned
         if not cleaned_data:
             df, _ = clean_data(df=df)
@@ -792,16 +874,16 @@ def ridge_regression_algo(file, target_column=None, test_size=0.3, random_state=
         # Save the trained model
         model_id = f"ridge_regression_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         model_filename = f"{model_id}.pkl"
-        model_path = os.path.join('trained_models', model_filename)
-        
-        os.makedirs('trained_models', exist_ok=True)
-        
+        model_path = os.path.join("trained_models", model_filename)
+
+        os.makedirs("trained_models", exist_ok=True)
+
         model_data = {
-            'model': model,
-            'feature_names': X.columns.tolist(),
-            'target_column': target_column,
-            'model_id': model_id,
-            'alpha': alpha
+            "model": model,
+            "feature_names": X.columns.tolist(),
+            "target_column": target_column,
+            "model_id": model_id,
+            "alpha": alpha,
         }
 
         joblib.dump(model_data, model_path)
@@ -809,35 +891,35 @@ def ridge_regression_algo(file, target_column=None, test_size=0.3, random_state=
 
         # Return metrics and other info
         return {
-            'r2': round(float(r2_score(y_test, preds)), 4),
-            'mae': round(float(mean_absolute_error(y_test, preds)), 4),
-            'rmse': round(float(sqrt(mean_squared_error(y_test, preds))), 4),
-            'n_samples': len(df),
-            'n_features': X.shape[1],
-            'top_features': dict(
+            "r2": round(float(r2_score(y_test, preds)), 4),
+            "mae": round(float(mean_absolute_error(y_test, preds)), 4),
+            "rmse": round(float(sqrt(mean_squared_error(y_test, preds))), 4),
+            "n_samples": len(df),
+            "n_features": X.shape[1],
+            "top_features": dict(
                 sorted(
-                    zip(X.columns.tolist(), [float(coef) for coef in model.coef_]), 
-                    key=lambda x: abs(x[1]), 
-                    reverse=True
+                    zip(X.columns.tolist(), [float(coef) for coef in model.coef_]),
+                    key=lambda x: abs(x[1]),
+                    reverse=True,
                 )[:5]
             ),
-            'predictions': [float(pred) for pred in preds],
-            'actual': [float(actual) for actual in y_test],
-            'model_id': model_id,
-            'testSize': float(test_size),
-            'alpha': float(alpha)
+            "predictions": [float(pred) for pred in preds],
+            "actual": [float(actual) for actual in y_test],
+            "model_id": model_id,
+            "testSize": float(test_size),
+            "alpha": float(alpha),
         }
 
     except Exception as e:
-        return {'error': str(e)}
-    
-def svm_classifier_algo(
-    file, 
-    target_column=None, 
-    test_size=0.3, 
-    random_state=43, 
-    cleaned_data=True,
+        return {"error": str(e)}
 
+
+def svm_classifier_algo(
+    file,
+    target_column=None,
+    test_size=0.3,
+    random_state=43,
+    cleaned_data=True,
     # SVM-specific arguments
     kernel="rbf",
     C=1.0,
@@ -845,11 +927,11 @@ def svm_classifier_algo(
     degree=3,
     shrinking=True,
     probability=True,
-    class_weight=None
+    class_weight=None,
 ):
     try:
         # Read CSV or Excel
-        if file.name.endswith(('.xls', '.xlsx')):
+        if file.name.endswith((".xls", ".xlsx")):
             df = pd.read_excel(file)
         else:
             df = pd.read_csv(io.BytesIO(file.read()))
@@ -891,7 +973,7 @@ def svm_classifier_algo(
             shrinking=shrinking,
             probability=probability,
             class_weight=class_weight,
-            random_state=random_state
+            random_state=random_state,
         )
 
         model.fit(X_train, y_train)
@@ -900,24 +982,23 @@ def svm_classifier_algo(
         # Save trained model
         model_id = f"svm_classifier_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         model_filename = f"{model_id}.pkl"
-        model_path = os.path.join('trained_models', model_filename)
+        model_path = os.path.join("trained_models", model_filename)
 
-        os.makedirs('trained_models', exist_ok=True)
+        os.makedirs("trained_models", exist_ok=True)
 
         model_data = {
-            'model': model,
-            'feature_names': X.columns.tolist(),
-            'target_column': target_column,
-            'model_id': model_id,
-
+            "model": model,
+            "feature_names": X.columns.tolist(),
+            "target_column": target_column,
+            "model_id": model_id,
             # Store SVM args
-            'kernel': kernel,
-            'C': C,
-            'gamma': gamma,
-            'degree': degree,
-            'shrinking': shrinking,
-            'probability': probability,
-            'class_weight': class_weight
+            "kernel": kernel,
+            "C": C,
+            "gamma": gamma,
+            "degree": degree,
+            "shrinking": shrinking,
+            "probability": probability,
+            "class_weight": class_weight,
         }
 
         joblib.dump(model_data, model_path)
@@ -929,7 +1010,7 @@ def svm_classifier_algo(
                 sorted(
                     zip(X.columns.tolist(), [float(c) for c in coefs]),
                     key=lambda x: abs(x[1]),
-                    reverse=True
+                    reverse=True,
                 )[:5]
             )
         else:
@@ -937,40 +1018,35 @@ def svm_classifier_algo(
 
         return {
             # Standard metrics
-            'accuracy': round(float(accuracy_score(y_test, preds)), 4),
-            'precision': round(float(precision_score(y_test, preds, average='weighted')), 4),
-            'recall': round(float(recall_score(y_test, preds, average='weighted')), 4),
-            'f1_score': round(float(f1_score(y_test, preds, average='weighted')), 4),
-
+            "accuracy": round(float(accuracy_score(y_test, preds)), 4),
+            "precision": round(
+                float(precision_score(y_test, preds, average="weighted")), 4
+            ),
+            "recall": round(float(recall_score(y_test, preds, average="weighted")), 4),
+            "f1_score": round(float(f1_score(y_test, preds, average="weighted")), 4),
             # Dataset info
-            'n_samples': len(df),
-            'n_features': X.shape[1],
-
+            "n_samples": len(df),
+            "n_features": X.shape[1],
             # Feature importance
-            'top_features': feature_importance,
-
+            "top_features": feature_importance,
             # Predictions
-            'predictions': [int(pred) for pred in preds],
-            'actual': [int(actual) for actual in y_test],
-
+            "predictions": [int(pred) for pred in preds],
+            "actual": [int(actual) for actual in y_test],
             # Model info
-            'model_id': model_id,
-
+            "model_id": model_id,
             # Returned SVM arguments
-            'kernel': kernel,
-            'C': float(C),
-            'gamma': gamma,
-            'degree': int(degree),
-            'shrinking': bool(shrinking),
-            'probability': bool(probability),
-            'class_weight': class_weight,
-
-            'testSize': float(test_size)
+            "kernel": kernel,
+            "C": float(C),
+            "gamma": gamma,
+            "degree": int(degree),
+            "shrinking": bool(shrinking),
+            "probability": bool(probability),
+            "class_weight": class_weight,
+            "testSize": float(test_size),
         }
 
     except Exception as e:
-        return {'error': str(e)}
-
+        return {"error": str(e)}
 
 
 def lasso_regression_algo(
@@ -979,12 +1055,12 @@ def lasso_regression_algo(
     test_size=0.3,
     random_state=101,
     cleaned_data=True,
-    alpha=1.0,          # Regularization strength
-    max_iter=1000
+    alpha=1.0,  # Regularization strength
+    max_iter=1000,
 ):
     try:
         # Read CSV or Excel
-        if file.name.endswith(('.xls', '.xlsx')):
+        if file.name.endswith((".xls", ".xlsx")):
             df = pd.read_excel(file)
         else:
             file.seek(0)
@@ -1036,65 +1112,60 @@ def lasso_regression_algo(
         os.makedirs("trained_models", exist_ok=True)
 
         model_data = {
-            'model': model,
-            'scaler': scaler,
-            'feature_names': X.columns.tolist(),
-            'target_column': target_column,
-            'model_id': model_id,
-            'config': {
-                "alpha": alpha,
-                "max_iter": max_iter
-            }
+            "model": model,
+            "scaler": scaler,
+            "feature_names": X.columns.tolist(),
+            "target_column": target_column,
+            "model_id": model_id,
+            "config": {"alpha": alpha, "max_iter": max_iter},
         }
 
         joblib.dump(model_data, model_path)
 
         # Metrics
         mse = mean_squared_error(y_test, preds)
-        rmse = float(np.sqrt(mse)) 
+        rmse = float(np.sqrt(mse))
         mae = mean_absolute_error(y_test, preds)
         r2 = r2_score(y_test, preds)
 
         # Feature coefficients
         coef_dict = dict(zip(X.columns.tolist(), model.coef_))
-        top_features = dict(sorted(coef_dict.items(), key=lambda x: abs(x[1]), reverse=True)[:5])
+        top_features = dict(
+            sorted(coef_dict.items(), key=lambda x: abs(x[1]), reverse=True)[:5]
+        )
 
         # Prepare prediction data
         prediction_data = []
         for i, (pred, actual) in enumerate(zip(preds, y_test)):
-            prediction_data.append({
-                'index': i + 1,
-                'prediction': float(pred),
-                'actual': float(actual),
-                'error': float(actual - pred)
-            })
+            prediction_data.append(
+                {
+                    "index": i + 1,
+                    "prediction": float(pred),
+                    "actual": float(actual),
+                    "error": float(actual - pred),
+                }
+            )
 
         return {
             "mse": float(mse),
             "rmse": float(rmse),
             "mae": float(mae),
             "r2_score": float(r2),
-
             "n_samples": int(len(df)),
             "n_features": int(X.shape[1]),
-
             "feature_coefficients": coef_dict,
             "top_features": top_features,
-
             "predictions": [float(p) for p in preds],
             "actual": [float(a) for a in y_test],
-
             "prediction_data": prediction_data,
-            
             "model_id": model_id,
             "testSize": float(test_size),
             "train_samples": int(len(X_train)),
             "test_samples": int(len(X_test)),
             "feature_names": X.columns.tolist(),
-
             # Training info
             "alpha": alpha,
-            "max_iter": max_iter
+            "max_iter": max_iter,
         }
 
     except Exception as e:
@@ -1107,13 +1178,13 @@ def elastic_net_regression_algo(
     test_size=0.3,
     random_state=101,
     cleaned_data=True,
-    alpha=1.0,            # Overall regularization strength
-    l1_ratio=0.5,         # Balance between L1 (Lasso) and L2 (Ridge)
-    max_iter=1000
+    alpha=1.0,  # Overall regularization strength
+    l1_ratio=0.5,  # Balance between L1 (Lasso) and L2 (Ridge)
+    max_iter=1000,
 ):
     try:
         # Read CSV or Excel
-        if file.name.endswith(('.xls', '.xlsx')):
+        if file.name.endswith((".xls", ".xlsx")):
             df = pd.read_excel(file)
         else:
             file.seek(0)
@@ -1154,10 +1225,7 @@ def elastic_net_regression_algo(
 
         # Build Elastic Net model
         model = ElasticNet(
-            alpha=alpha,
-            l1_ratio=l1_ratio,
-            max_iter=max_iter,
-            random_state=random_state
+            alpha=alpha, l1_ratio=l1_ratio, max_iter=max_iter, random_state=random_state
         )
         model.fit(X_train_scaled, y_train)
 
@@ -1170,16 +1238,12 @@ def elastic_net_regression_algo(
         os.makedirs("trained_models", exist_ok=True)
 
         model_data = {
-            'model': model,
-            'scaler': scaler,
-            'feature_names': X.columns.tolist(),
-            'target_column': target_column,
-            'model_id': model_id,
-            'config': {
-                "alpha": alpha,
-                "l1_ratio": l1_ratio,
-                "max_iter": max_iter
-            }
+            "model": model,
+            "scaler": scaler,
+            "feature_names": X.columns.tolist(),
+            "target_column": target_column,
+            "model_id": model_id,
+            "config": {"alpha": alpha, "l1_ratio": l1_ratio, "max_iter": max_iter},
         }
 
         joblib.dump(model_data, model_path)
@@ -1199,62 +1263,58 @@ def elastic_net_regression_algo(
         # Prepare prediction data
         prediction_data = []
         for i, (pred, actual) in enumerate(zip(preds, y_test)):
-            prediction_data.append({
-                'index': i + 1,
-                'prediction': float(pred),
-                'actual': float(actual),
-                'error': float(actual - pred)
-            })
+            prediction_data.append(
+                {
+                    "index": i + 1,
+                    "prediction": float(pred),
+                    "actual": float(actual),
+                    "error": float(actual - pred),
+                }
+            )
 
         return {
             "mse": float(mse),
             "rmse": float(rmse),
             "mae": float(mae),
             "r2_score": float(r2),
-
             "n_samples": int(len(df)),
             "n_features": int(X.shape[1]),
-
             "feature_coefficients": coef_dict,
             "top_features": top_features,
-
             "predictions": [float(p) for p in preds],
             "actual": [float(a) for a in y_test],
-
             "prediction_data": prediction_data,
-
             "model_id": model_id,
             "testSize": float(test_size),
             "train_samples": int(len(X_train)),
             "test_samples": int(len(X_test)),
             "feature_names": X.columns.tolist(),
-
             # Training info
             "alpha": alpha,
             "l1_ratio": l1_ratio,
-            "max_iter": max_iter
+            "max_iter": max_iter,
         }
 
     except Exception as e:
         return {"error": str(e)}
-    
+
+
 def adaboost_classifier_algo(
     file,
     target_column=None,
     test_size=0.3,
     random_state=42,
     cleaned_data=True,
-
     # AdaBoost-specific arguments
     n_estimators=50,
     learning_rate=1.0,
-    algorithm="SAMME"
+    algorithm="SAMME",
 ):
     try:
         # ===============================
         # 🔹 Read CSV or Excel
         # ===============================
-        if file.name.endswith(('.xls', '.xlsx')):
+        if file.name.endswith((".xls", ".xlsx")):
             df = pd.read_excel(file)
         else:
             file.seek(0)
@@ -1293,11 +1353,7 @@ def adaboost_classifier_algo(
         # 🔹 Train / Test Split
         # ===============================
         X_train, X_test, y_train, y_test = train_test_split(
-            X,
-            y,
-            test_size=test_size,
-            random_state=random_state,
-            stratify=y
+            X, y, test_size=test_size, random_state=random_state, stratify=y
         )
 
         # ===============================
@@ -1307,7 +1363,7 @@ def adaboost_classifier_algo(
             n_estimators=n_estimators,
             learning_rate=learning_rate,
             algorithm=algorithm,
-            random_state=random_state
+            random_state=random_state,
         )
 
         model.fit(X_train, y_train)
@@ -1327,11 +1383,10 @@ def adaboost_classifier_algo(
             "feature_names": X.columns.tolist(),
             "target_column": target_column,
             "model_id": model_id,
-
             # AdaBoost configuration
             "n_estimators": n_estimators,
             "learning_rate": learning_rate,
-            "algorithm": algorithm
+            "algorithm": algorithm,
         }
 
         joblib.dump(model_data, model_path)
@@ -1343,7 +1398,7 @@ def adaboost_classifier_algo(
             sorted(
                 zip(X.columns.tolist(), model.feature_importances_),
                 key=lambda x: x[1],
-                reverse=True
+                reverse=True,
             )[:5]
         )
 
@@ -1353,30 +1408,26 @@ def adaboost_classifier_algo(
         return {
             # Metrics
             "accuracy": round(float(accuracy_score(y_test, preds)), 4),
-            "precision": round(float(precision_score(y_test, preds, average="weighted")), 4),
+            "precision": round(
+                float(precision_score(y_test, preds, average="weighted")), 4
+            ),
             "recall": round(float(recall_score(y_test, preds, average="weighted")), 4),
             "f1_score": round(float(f1_score(y_test, preds, average="weighted")), 4),
-
             # Dataset info
             "n_samples": int(len(df)),
             "n_features": int(X.shape[1]),
-
             # Feature importance
             "top_features": feature_importance,
-
             # Predictions
             "predictions": [int(p) for p in preds],
             "actual": [int(a) for a in y_test],
-
             # Model info
             "model_id": model_id,
-
             # AdaBoost parameters
             "n_estimators": int(n_estimators),
             "learning_rate": float(learning_rate),
             "algorithm": algorithm,
-
-            "testSize": float(test_size)
+            "testSize": float(test_size),
         }
 
     except Exception as e:
@@ -1389,7 +1440,6 @@ def gradient_boosting_classifier_algo(
     test_size=0.3,
     random_state=42,
     cleaned_data=True,
-
     # Gradient Boosting specific arguments
     n_estimators=100,
     learning_rate=0.1,
@@ -1397,7 +1447,7 @@ def gradient_boosting_classifier_algo(
     subsample=1.0,
     min_samples_split=2,
     min_samples_leaf=1,
-    max_features=None
+    max_features=None,
 ):
     try:
         # ===============================
@@ -1414,7 +1464,7 @@ def gradient_boosting_classifier_algo(
         # ===============================
         # 🔹 Read CSV or Excel
         # ===============================
-        if file.name.endswith(('.xls', '.xlsx')):
+        if file.name.endswith((".xls", ".xlsx")):
             df = pd.read_excel(file)
         else:
             file.seek(0)
@@ -1453,11 +1503,7 @@ def gradient_boosting_classifier_algo(
         # 🔹 Train / Test Split
         # ===============================
         X_train, X_test, y_train, y_test = train_test_split(
-            X,
-            y,
-            test_size=test_size,
-            random_state=random_state,
-            stratify=y
+            X, y, test_size=test_size, random_state=random_state, stratify=y
         )
 
         # ===============================
@@ -1471,7 +1517,7 @@ def gradient_boosting_classifier_algo(
             min_samples_split=_min_samples_split,
             min_samples_leaf=_min_samples_leaf,
             max_features=_max_features,
-            random_state=random_state
+            random_state=random_state,
         )
 
         model.fit(X_train, y_train)
@@ -1480,7 +1526,9 @@ def gradient_boosting_classifier_algo(
         # ===============================
         # 🔹 Save Trained Model
         # ===============================
-        model_id = f"gradient_boosting_classifier_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        model_id = (
+            f"gradient_boosting_classifier_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        )
         model_path = os.path.join("trained_models", f"{model_id}.pkl")
         os.makedirs("trained_models", exist_ok=True)
 
@@ -1489,9 +1537,9 @@ def gradient_boosting_classifier_algo(
                 "model": model,
                 "feature_names": X.columns.tolist(),
                 "target_column": target_column,
-                "model_id": model_id
+                "model_id": model_id,
             },
-            model_path
+            model_path,
         )
 
         # ===============================
@@ -1501,7 +1549,7 @@ def gradient_boosting_classifier_algo(
             sorted(
                 zip(X.columns.tolist(), model.feature_importances_),
                 key=lambda x: x[1],
-                reverse=True
+                reverse=True,
             )[:5]
         )
 
@@ -1510,20 +1558,17 @@ def gradient_boosting_classifier_algo(
         # ===============================
         return {
             "accuracy": round(float(accuracy_score(y_test, preds)), 4),
-            "precision": round(float(precision_score(y_test, preds, average="weighted")), 4),
+            "precision": round(
+                float(precision_score(y_test, preds, average="weighted")), 4
+            ),
             "recall": round(float(recall_score(y_test, preds, average="weighted")), 4),
             "f1_score": round(float(f1_score(y_test, preds, average="weighted")), 4),
-
             "n_samples": int(len(df)),
             "n_features": int(X.shape[1]),
-
             "top_features": feature_importance,
-
             "predictions": [int(p) for p in preds],
             "actual": [int(a) for a in y_test],
-
             "model_id": model_id,
-
             # Hyperparameters
             "n_estimators": _n_estimators,
             "learning_rate": _learning_rate,
@@ -1532,26 +1577,26 @@ def gradient_boosting_classifier_algo(
             "min_samples_split": _min_samples_split,
             "min_samples_leaf": _min_samples_leaf,
             "max_features": _max_features,
-
-            "testSize": float(test_size)
+            "testSize": float(test_size),
         }
 
     except Exception as e:
         return {"error": str(e)}
 
+
 def principal_component_analysis_algo(
     file,
-    target_column=None,          # optional (for visualization only)
-    n_components=None,           # int or float (e.g. 0.95)
+    target_column=None,  # optional (for visualization only)
+    n_components=None,  # int or float (e.g. 0.95)
     cleaned_data=True,
     scale_data=True,
-    random_state=101
+    random_state=101,
 ):
     try:
         # ===============================
         # 🔹 READ FILE
         # ===============================
-        if file.name.endswith(('.xls', '.xlsx')):
+        if file.name.endswith((".xls", ".xlsx")):
             df = pd.read_excel(file)
         else:
             file.seek(0)
@@ -1616,10 +1661,7 @@ def principal_component_analysis_algo(
             "feature_names": X.columns.tolist(),
             "target_column": target_column,
             "model_id": model_id,
-            "config": {
-                "n_components": n_components,
-                "scale_data": scale_data
-            }
+            "config": {"n_components": n_components, "scale_data": scale_data},
         }
 
         joblib.dump(model_data, model_path)
@@ -1634,17 +1676,12 @@ def principal_component_analysis_algo(
         loadings = pd.DataFrame(
             pca.components_,
             columns=X.columns,
-            index=[f"PC{i+1}" for i in range(pca.n_components_)]
+            index=[f"PC{i+1}" for i in range(pca.n_components_)],
         )
 
         # Top features per component
         top_features = {
-            pc: dict(
-                loadings.loc[pc]
-                .abs()
-                .sort_values(ascending=False)
-                .head(5)
-            )
+            pc: dict(loadings.loc[pc].abs().sort_values(ascending=False).head(5))
             for pc in loadings.index
         }
 
@@ -1655,7 +1692,7 @@ def principal_component_analysis_algo(
             {
                 "index": int(i + 1),
                 "components": [float(val) for val in row],
-                "target": str(y.iloc[i]) if y is not None else None
+                "target": str(y.iloc[i]) if y is not None else None,
             }
             for i, row in enumerate(X_pca)
         ]
@@ -1665,37 +1702,28 @@ def principal_component_analysis_algo(
         # ===============================
         return {
             "model_id": model_id,
-
             "n_samples": int(X.shape[0]),
             "original_features": int(X.shape[1]),
             "n_components": int(pca.n_components_),
-
             "explained_variance_ratio": [float(v) for v in explained_variance],
             "cumulative_variance": [float(v) for v in cumulative_variance],
-
             "components": {
                 f"PC{i+1}": [float(val) for val in comp]
                 for i, comp in enumerate(pca.components_)
             },
-
             "feature_loadings": {
                 pc: {str(k): float(v) for k, v in loadings.loc[pc].items()}
                 for pc in loadings.index
             },
-
             "top_features_per_component": {
                 pc: {str(k): float(v) for k, v in feats.items()}
                 for pc, feats in top_features.items()
             },
-
             "transformed_data": transformed_data,
-
             "scale_data": scale_data,
             "target_column": target_column,
-            "feature_names": X.columns.tolist()
+            "feature_names": X.columns.tolist(),
         }
 
     except Exception as e:
         return {"error": str(e)}
-
-    

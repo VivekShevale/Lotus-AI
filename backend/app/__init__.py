@@ -24,9 +24,11 @@ def create_app():
     from app.controllers.clean_controller import clean_bp
     from app.routes.auth_routes import auth_bp
     from app.routes.analyze_routes import analyze_bp
+    from app.routes.model_routes import model_bp
 
     # register blueprints
     app.register_blueprint(main)
+    app.register_blueprint(model_bp)
     app.register_blueprint(ml)
     app.register_blueprint(data)
     app.register_blueprint(workflow_bp)

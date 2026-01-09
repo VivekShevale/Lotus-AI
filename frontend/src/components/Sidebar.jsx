@@ -33,7 +33,7 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
   const sidebarRef = useRef(null);
 
   // Main navigation items
-  const mainMenuItems = [{ name: "Dashboard", href: "/home", icon: HomeIcon }];
+  const mainMenuItems = [{ name: "Dashboard", href: "/", icon: HomeIcon }];
 
   // Models section items
   // In your Sidebar component, update the modelsItems to include the main models page:
@@ -46,7 +46,7 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
   // Data section items
   const dataItems = [
     { name: "Upload Data", href: "/data/upload", icon: UploadIcon },
-    { name: "Datasets", href: "/data/datasets", icon: DatabaseIcon },
+    { name: "Dataset Analyzer", href: "/analyze", icon: DatabaseIcon },
     { name: "Data Sources", href: "/data/sources", icon: FolderOpenIcon },
   ];
 
@@ -146,7 +146,7 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
           </div>
           <div>
             <h2 className="font-semibold text-gray-900 dark:text-white">
-              AI Platform
+              Lotus AI
             </h2>
             <p className="text-xs text-gray-500 dark:text-zinc-400">
               Workspace

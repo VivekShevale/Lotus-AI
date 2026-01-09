@@ -163,7 +163,7 @@ const HomePage = () => {
                 <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-lg flex items-center justify-center">
                   <Leaf className="w-4 h-4 text-white" />
                 </div>
-                Arbor AI
+                Lotus AI
               </h1>
               <p className="text-sm text-gray-600 dark:text-zinc-400 mt-1">
                 Intelligent Machine Learning Platform
