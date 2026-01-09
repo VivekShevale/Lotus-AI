@@ -1,0 +1,10 @@
+__pycache__/
+*.pkl
+*.joblib
+*.h5
+*.pt
+.env
+.venv/
+node_modules/
+data/
+trained_models/
