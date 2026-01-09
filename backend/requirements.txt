@@ -31,3 +31,5 @@ langgraph
 langchain
 python-multipart
 joblib
+psycopg2
+marshmallow
