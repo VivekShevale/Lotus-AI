@@ -33,3 +33,4 @@ python-multipart
 joblib
 psycopg2
 marshmallow
+boto3
